@@ -264,7 +264,7 @@ phonetic/
 
 Each phase ends with something that runs. The goal is to get end-to-end audio in my podcast app early (end of Phase 4), then make it better.
 
-### Phase 0: Setup
+### Phase 0: Setup ✅
 - macOS dev tools are ready (Go, ffmpeg, Docker, sqlite3). Arch setup is deferred to Phase 4.
 - `go mod init`, project layout, config loading, `slog` logging, `.gitignore` (`bin/`, `data/`, env files).
 - `Makefile` with `build`, `build-linux`, `run`, `test`, `vet`, `fmt`, `clean` (`deploy` and `kokoro-*` targets added in later phases).
@@ -275,6 +275,12 @@ Each phase ends with something that runs. The goal is to get end-to-end audio in
 - `POST/GET /api/articles` with bearer auth, URL normalization, deduplication.
 - Worker loop with leases, the state machine, retries and backoff, all running stub stages.
 - **Done when:** curl-posting a URL moves it through stub stages to `ready`, and a crash mid-job recovers.
+- Carried over from Phase 0:
+  - Shutdown order is HTTP, then workers, then store. Workers need a root context and a WaitGroup/errgroup in `main`, and the serve-error path must stop them too.
+  - The claim query is `status = ? AND next_attempt_at <= ?` (index-backed). Lease compare-and-set on stage writes. Never hold a write transaction across network, LLM or TTS calls. Read-only transactions pass `ReadOnly: true`.
+  - modernc's busy wait ignores context cancellation, so a blocked write can stall shutdown for up to `busy_timeout` (5s).
+  - `server.New` takes a `Deps` struct; extend it rather than adding positional arguments. Add `http.MaxBytesReader` on JSON bodies.
+  - E2E helpers take `testing.TB` per call; the harness has `restart`, `kill` and `waitForLog` ready for recovery tests.
 
 ### Phase 2: Fetch and extract
 - HTTP fetcher with timeouts, size limit, and the private-IP block.
