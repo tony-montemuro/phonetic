@@ -13,7 +13,7 @@ PHONETIC_ADDR      ?= 127.0.0.1:8080
 PHONETIC_DATA_DIR  ?= data
 PHONETIC_LOG_LEVEL ?= debug
 
-.PHONY: build build-linux run test test-short vet fmt fmt-check tidy-check clean
+.PHONY: build build-linux run test test-short test-e2e test-all vet fmt fmt-check tidy-check clean
 
 build:
 	$(GO) build -trimpath -o $(BIN_DIR)/$(BINARY) $(PKG)
@@ -28,13 +28,21 @@ run: build
 	./$(BIN_DIR)/$(BINARY)
 
 test:
-	$(GO) test ./...
+	$(GO) test -race ./...
 
 test-short:
 	$(GO) test -short ./...
 
+# Builds and runs the real binary (race-enabled); see e2e/.
+test-e2e:
+	$(GO) test -tags e2e -race -count=1 ./e2e/...
+
+test-all: test test-e2e
+
 vet:
 	$(GO) vet ./...
+	$(GO) vet -tags e2e ./e2e/...
+	$(GO) vet -tags 'e2e race' ./e2e/...
 
 fmt:
 	gofmt -s -w .
