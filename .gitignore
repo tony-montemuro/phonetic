@@ -1,0 +1,20 @@
+# Build output
+/bin/
+
+# Local runtime data (DB, article artifacts, audio)
+/data/
+
+# Secrets / local env
+.env
+*.env
+
+# Claude: personal memories and local settings
+/.claude/memories/
+/.claude/settings.local.json
+/CLAUDE.local.md
+
+# Scratch audio
+*.aiff
+
+# OS / editor
+.DS_Store
