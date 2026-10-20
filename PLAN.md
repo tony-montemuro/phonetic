@@ -68,37 +68,16 @@ One Go binary runs the HTTP server and the background workers. Kokoro runs next 
 
 A single `articles` table doubles as the job queue. Large outputs live on disk, not in SQLite.
 
-```sql
-CREATE TABLE articles (
-  id               INTEGER PRIMARY KEY,
-  url              TEXT NOT NULL UNIQUE,      -- normalized (strip fragment, tracking params)
-  status           TEXT NOT NULL,             -- see state machine below
-  failed_stage     TEXT,                      -- stage to resume from on retry
-  error            TEXT,
-  attempts         INTEGER NOT NULL DEFAULT 0,
-  next_attempt_at  TIMESTAMP,                 -- backoff for retries
-  locked_until     TIMESTAMP,                 -- worker lease; recovers jobs after a crash
+The schema lives in `internal/store/migrations/0001_create_articles.sql`. That file is authoritative; this is a summary:
 
-  -- metadata (filled in during extract/script)
-  title            TEXT,
-  author           TEXT,
-  site_name        TEXT,
-  published_at     TIMESTAMP,
-  word_count       INTEGER,
-  image_count      INTEGER,
-  image_importance INTEGER,                   -- 0 none · 1 decorative · 2 helpful · 3 essential
-  image_notes      TEXT,                      -- short "why look at the images" note
-
-  -- output
-  audio_bytes      INTEGER,
-  duration_seconds INTEGER,
-
-  created_at       TIMESTAMP NOT NULL,
-  updated_at       TIMESTAMP NOT NULL,
-  ready_at         TIMESTAMP
-);
-CREATE INDEX articles_status ON articles(status, next_attempt_at);
-```
+- `id INTEGER PRIMARY KEY AUTOINCREMENT`: ids are never reused, because they key the feed GUID and the artifact directory.
+- `url` (unique, normalized), `status` (CHECK on the state set), `failed_stage`, `error`, `attempts`.
+- Queue: `next_attempt_at` (NOT NULL; set to `created_at` on insert), `locked_until` (lease). Writes that complete a stage compare-and-set on `locked_until`.
+- Metadata: `title`, `author`, `site_name`, `published_at`, `word_count`, `image_count`, `image_importance` (0–3, CHECK), `image_notes`.
+- Output: `audio_bytes`, `duration_ms`.
+- `created_at`, `updated_at`, `ready_at`.
+- All timestamps are INTEGER Unix milliseconds (UTC). The table is `STRICT`. Index on `(status, next_attempt_at)`.
+- Migrations are forward-only, tracked in `PRAGMA user_version`, each run in its own transaction.
 
 Files on disk, one directory per article:
 

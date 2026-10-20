@@ -7,10 +7,12 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime/debug"
 	"syscall"
 
 	"github.com/tony-montemuro/phonetic/internal/config"
+	"github.com/tony-montemuro/phonetic/internal/store"
 )
 
 func main() {
@@ -33,6 +35,20 @@ func run() error {
 	defer stop()
 
 	logger.Info("starting phonetic", "version", version(), "addr", cfg.Addr, "data_dir", cfg.DataDir)
+
+	if err := os.MkdirAll(cfg.DataDir, 0o750); err != nil {
+		return fmt.Errorf("data dir: %w", err)
+	}
+	st, err := store.Open(ctx, filepath.Join(cfg.DataDir, "phonetic.db"))
+	if err != nil {
+		return fmt.Errorf("store: %w", err)
+	}
+	defer func() {
+		// Close performs the final WAL checkpoint; surface failures.
+		if err := st.Close(); err != nil {
+			logger.Error("closing store", "err", err)
+		}
+	}()
 
 	<-ctx.Done()
 	// Restore default signal handling so a second signal force-exits.

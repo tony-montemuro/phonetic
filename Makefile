@@ -13,7 +13,7 @@ PHONETIC_ADDR      ?= 127.0.0.1:8080
 PHONETIC_DATA_DIR  ?= data
 PHONETIC_LOG_LEVEL ?= debug
 
-.PHONY: build build-linux run test test-short vet fmt fmt-check clean
+.PHONY: build build-linux run test test-short vet fmt fmt-check tidy-check clean
 
 build:
 	$(GO) build -trimpath -o $(BIN_DIR)/$(BINARY) $(PKG)
@@ -42,6 +42,10 @@ fmt:
 # Fails if any file needs formatting.
 fmt-check:
 	@out=$$(gofmt -s -l .); if [ -n "$$out" ]; then echo "needs gofmt:"; echo "$$out"; exit 1; fi
+
+# Fails if go.mod/go.sum are not tidy.
+tidy-check:
+	$(GO) mod tidy -diff
 
 clean:
 	rm -rf $(BIN_DIR)
