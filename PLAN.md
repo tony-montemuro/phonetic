@@ -195,7 +195,7 @@ Retention: the feed shows articles from the last N days (configurable). A cleanu
 
 ## Configuration
 
-Environment variables, with flags for local development. For example:
+Environment variables only (no flags). `make run` supplies dev defaults. Blank values fall back to defaults, all errors are reported together, and relative paths are made absolute. For example:
 
 ```
 PHONETIC_ADDR=100.x.y.z:8080
@@ -234,7 +234,7 @@ The user develops on macOS (Apple Silicon, `darwin/arm64`). The service runs on 
 
 Arch layout: binary at `/usr/local/bin/phonetic`, data in `/var/lib/phonetic`, secrets in `/etc/phonetic/env` (mode 600, loaded via `EnvironmentFile=`), unit at `/etc/systemd/system/phonetic.service`, run as a dedicated `phonetic` user. Kokoro via `deploy/kokoro.compose.yml` (GPU image) with `restart: unless-stopped`.
 
-**Makefile targets:** `build`, `build-linux`, `run`, `test`, `test-short`, `test-e2e`, `test-all`, `vet`, `fmt`, `kokoro-up` / `kokoro-down`, `deploy`, `clean`. Note: macOS ships GNU Make 3.81, so avoid 3.82+ features such as `.ONESHELL`.
+**Makefile targets:** `build`, `build-linux`, `run`, `test`, `test-short`, `test-e2e`, `test-all`, `vet`, `fmt`, `fmt-check`, `kokoro-up` / `kokoro-down`, `deploy`, `clean`. Note: macOS ships GNU Make 3.81, so avoid 3.82+ features such as `.ONESHELL`.
 
 ## Testing strategy
 
