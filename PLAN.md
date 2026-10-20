@@ -143,8 +143,8 @@ Adapters planned: `fetch.HTTP`; `llm.Anthropic`, `llm.None` (fallback/passthroug
 | `GET` | `/api/articles/{id}` | Bearer token | One article's status and metadata. |
 | `POST` | `/api/articles/{id}/reprocess` | Bearer token | Re-run from a given stage (default: the failed stage). |
 | `GET` | `/feed.xml` | Basic auth | Podcast feed of `ready` articles, newest first. Conditional GET supported. |
-| `GET` | `/audio/{id}.mp3` | Basic auth | Episode audio via `http.ServeFile` (range requests supported). |
-| `GET` | `/healthz` | none | Liveness. |
+| `GET` | `/audio/{file}` | Basic auth | Episode audio, e.g. `/audio/42.mp3`, via `http.ServeFile` (range requests supported). ServeMux wildcards must be a whole segment, so the handler strips and checks the `.mp3` suffix and parses the id. |
+| `GET` | `/healthz` | none | Readiness: 200 if the DB answers within 2s, else 503. |
 
 Go 1.22+ `http.ServeMux` method/path patterns handle routing, so no router library is needed.
 
@@ -290,7 +290,7 @@ Each phase ends with something that runs. The goal is to get end-to-end audio in
 - **Done when:** a posted URL becomes a listenable `audio.mp3`.
 
 ### Phase 4: Feed and delivery (MVP)
-- `/feed.xml` with iTunes tags and conditional GET; `/audio/{id}.mp3`; basic auth; channel artwork.
+- `/feed.xml` with iTunes tags and conditional GET; `/audio/{file}` (`<id>.mp3`); basic auth; channel artwork.
 - Arch setup: ffmpeg, Docker + `nvidia-container-toolkit`, Kokoro GPU container, `phonetic` user and directories, `/etc/phonetic/env`.
 - systemd unit; `make deploy`; turn off sleep.
 - Tailscale on the PC and iPhone (and the Mac, for deploying). Subscribe in Apple Podcasts by URL. Fall back to Downcast, or Funnel, if needed.
