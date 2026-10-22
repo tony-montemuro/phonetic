@@ -144,6 +144,12 @@ func launch(t testing.TB, opts options) *instance {
 		"PHONETIC_LOG_LEVEL": "debug",
 		"PHONETIC_API_TOKEN": apiToken,
 	}
+	// Race-enabled binaries sleep atexit_sleep_ms (default 1s) on exit;
+	// shorten it unless the developer set GORACE themselves (even to empty),
+	// in which case theirs is passed through unchanged, not merged.
+	if _, set := os.LookupEnv("GORACE"); raceEnabled && !set {
+		env["GORACE"] = "atexit_sleep_ms=100"
+	}
 	for k, v := range opts.Env {
 		env[k] = v
 	}
@@ -284,12 +290,26 @@ func (i *instance) status() exitStatus {
 // current process must have exited.
 func (i *instance) restart(t testing.TB) *instance {
 	t.Helper()
+	return i.restartWith(t, nil)
+}
+
+// restartWith is restart with env overrides layered on the original env.
+func (i *instance) restartWith(t testing.TB, env map[string]string) *instance {
+	t.Helper()
 	select {
 	case <-i.exited:
 	default:
 		t.Fatal("restart: previous process still running")
 	}
-	return start(t, i.opts)
+	opts := i.opts
+	opts.Env = map[string]string{}
+	for k, v := range i.opts.Env {
+		opts.Env[k] = v
+	}
+	for k, v := range env {
+		opts.Env[k] = v
+	}
+	return start(t, opts)
 }
 
 // get performs a GET against the instance; the body is closed at cleanup.
