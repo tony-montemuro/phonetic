@@ -6,10 +6,11 @@
 --   * A row is runnable when status is a non-terminal stage and
 --     next_attempt_at <= now (set to created_at on insert, pushed out for
 --     retry backoff), and it is not leased (locked_until NULL or <= now).
---   * A worker claims a row by setting locked_until. Every write that
---     completes or fails a stage must compare-and-set on the lease
---     (WHERE id = ? AND locked_until = ?) so a worker whose lease expired and
---     was reclaimed can't overwrite the new owner's results.
+--   * A worker claims a row by setting locked_until (expiry) and, since
+--     migration 0002, lease_id (token). Every write that completes or fails a
+--     stage must compare-and-set on (id, lease_id, status) so a worker whose
+--     lease expired and was reclaimed can't overwrite the new owner's
+--     results. Do not CAS on locked_until: heartbeats change it.
 CREATE TABLE articles (
     -- AUTOINCREMENT: ids are never reused. They key the feed GUID and the
     -- on-disk artifact directory.

@@ -68,11 +68,11 @@ One Go binary runs the HTTP server and the background workers. Kokoro runs next 
 
 A single `articles` table doubles as the job queue. Large outputs live on disk, not in SQLite.
 
-The schema lives in `internal/store/migrations/0001_create_articles.sql`. That file is authoritative; this is a summary:
+The schema lives in `internal/store/migrations/` (0001, 0002, ...). Those files are authoritative; this is a summary:
 
 - `id INTEGER PRIMARY KEY AUTOINCREMENT`: ids are never reused, because they key the feed GUID and the artifact directory.
 - `url` (unique, normalized), `status` (CHECK on the state set), `failed_stage`, `error`, `attempts`.
-- Queue: `next_attempt_at` (NOT NULL; set to `created_at` on insert), `locked_until` (lease). Writes that complete a stage compare-and-set on `locked_until`.
+- Queue: `next_attempt_at` (NOT NULL; set to `created_at` on insert), `locked_until` (lease expiry), `lease_id` (random lease token, migration 0002). Lease-guarded writes compare-and-set on `(id, lease_id, status)`; heartbeats move only `locked_until`.
 - Metadata: `title`, `author`, `site_name`, `published_at`, `word_count`, `image_count`, `image_importance` (0–3, CHECK), `image_notes`.
 - Output: `audio_bytes`, `duration_ms`.
 - `created_at`, `updated_at`, `ready_at`.
@@ -277,7 +277,7 @@ Each phase ends with something that runs. The goal is to get end-to-end audio in
 - **Done when:** curl-posting a URL moves it through stub stages to `ready`, and a crash mid-job recovers.
 - Carried over from Phase 0:
   - Shutdown order is HTTP, then workers, then store. Workers need a root context and a WaitGroup/errgroup in `main`, and the serve-error path must stop them too.
-  - The claim query is `status = ? AND next_attempt_at <= ?` (index-backed). Lease compare-and-set on stage writes. Never hold a write transaction across network, LLM or TTS calls. Read-only transactions pass `ReadOnly: true`.
+  - Claims: runnable statuses, `next_attempt_at <= now`, no live lease, `ORDER BY id` (depth-first, so the oldest article finishes first), optional stage filter (for the one-at-a-time GPU stage). Lease compare-and-set on `lease_id`. Never hold a write transaction across network, LLM or TTS calls. Read-only transactions pass `ReadOnly: true`.
   - modernc's busy wait ignores context cancellation, so a blocked write can stall shutdown for up to `busy_timeout` (5s).
   - `server.New` takes a `Deps` struct; extend it rather than adding positional arguments. Add `http.MaxBytesReader` on JSON bodies.
   - E2E helpers take `testing.TB` per call; the harness has `restart`, `kill` and `waitForLog` ready for recovery tests.
@@ -314,7 +314,7 @@ Each phase ends with something that runs. The goal is to get end-to-end audio in
 - **Done when:** episodes sound like narration rather than a page read aloud, and image-heavy articles are flagged.
 
 ### Phase 7: Hardening
-- Reprocess endpoint; retention cleanup job.
+- Reprocess endpoint; retention cleanup job. The reprocess store method must refuse leased rows (or clear `locked_until` and `lease_id` in the same UPDATE); otherwise the article waits for the old lease to expire.
 - Better failure visibility (e.g. failed articles appear as a short "failed: <title>" episode, or a status endpoint I check).
 - SQLite backups (a periodic `VACUUM INTO`).
 - Fill gaps in test coverage; E2E crash-recovery and retry scenarios.
