@@ -56,6 +56,9 @@ func runMain(m *testing.M) int {
 	return m.Run()
 }
 
+// apiToken is the bearer token every instance is started with.
+const apiToken = "e2e-test-token-0123456789"
+
 // Timeouts used across the harness.
 const (
 	readyTimeout = 10 * time.Second
@@ -139,6 +142,7 @@ func launch(t testing.TB, opts options) *instance {
 		"PHONETIC_ADDR":      opts.Addr,
 		"PHONETIC_DATA_DIR":  opts.DataDir,
 		"PHONETIC_LOG_LEVEL": "debug",
+		"PHONETIC_API_TOKEN": apiToken,
 	}
 	for k, v := range opts.Env {
 		env[k] = v

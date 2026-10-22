@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -15,12 +16,19 @@ import (
 	"time"
 
 	"github.com/tony-montemuro/phonetic/internal/config"
+	"github.com/tony-montemuro/phonetic/internal/pipeline"
 	"github.com/tony-montemuro/phonetic/internal/server"
 	"github.com/tony-montemuro/phonetic/internal/store"
 )
 
-// shutdownTimeout bounds how long in-flight requests get to finish.
-const shutdownTimeout = 10 * time.Second
+const (
+	// httpShutdownTimeout bounds how long in-flight requests get to finish.
+	httpShutdownTimeout = 10 * time.Second
+	// workerShutdownTimeout bounds how long interrupted stages get to wind
+	// down and release their leases. A lease left behind is cleared at the
+	// next start (and that attempt counts).
+	workerShutdownTimeout = 30 * time.Second
+)
 
 func main() {
 	if err := run(); err != nil {
@@ -41,11 +49,20 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	logger.Info("starting phonetic", "version", version(), "addr", cfg.Addr, "data_dir", cfg.DataDir)
+	logger.Info("starting phonetic", "version", version(), "addr", cfg.Addr, "data_dir", cfg.DataDir,
+		"workers", cfg.Workers)
 
 	if err := os.MkdirAll(cfg.DataDir, 0o750); err != nil {
 		return fmt.Errorf("data dir: %w", err)
 	}
+	// Exclusive lock first: everything below assumes this is the only
+	// phonetic process using the data dir.
+	unlock, err := lockDataDir(cfg.DataDir)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+
 	st, err := store.Open(ctx, filepath.Join(cfg.DataDir, "phonetic.db"))
 	if err != nil {
 		return fmt.Errorf("store: %w", err)
@@ -61,8 +78,35 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("listen: %w", err)
 	}
+
+	// We hold the data-dir lock, so any lease still held belongs to a
+	// previous run that died; make that work runnable now, not after expiry.
+	n, err := st.ReleaseAllLeases(ctx, time.Now())
+	if err != nil {
+		return fmt.Errorf("releasing stale leases: %w", err)
+	}
+	if n > 0 {
+		logger.Warn("released stale leases from a previous run", "count", n)
+	}
+
+	// TODO(phase-3): remove StubDelay with the stub stages.
+	if cfg.StubDelay > 0 {
+		logger.Warn("stub stages sleep between steps (PHONETIC_DEV_STUB_DELAY)", "delay", cfg.StubDelay)
+	}
+	runner, err := pipeline.New(st, pipeline.StubStages(cfg.StubDelay), logger,
+		pipeline.Options{Workers: cfg.Workers})
+	if err != nil {
+		return err
+	}
+
 	srv := &http.Server{
-		Handler:           server.New(server.Deps{Logger: logger, DB: st}),
+		Handler: server.New(server.Deps{
+			Logger:   logger,
+			DB:       st,
+			Articles: st,
+			Notifier: runner,
+			APIToken: cfg.APIToken,
+		}),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		IdleTimeout:       2 * time.Minute,
@@ -71,33 +115,91 @@ func run() error {
 		ErrorLog: slog.NewLogLogger(logger.Handler(), slog.LevelWarn),
 	}
 
+	// Workers get their own context so they can be stopped after HTTP.
+	workerCtx, stopWorkers := context.WithCancel(context.Background())
+	defer stopWorkers()
+	workersDone := make(chan struct{})
+	go func() {
+		defer close(workersDone)
+		runner.Run(workerCtx)
+	}()
+
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- srv.Serve(ln) }()
 	logger.Info("listening", "addr", ln.Addr().String())
 
+	var runErr error
 	select {
 	case err := <-serveErr:
-		return fmt.Errorf("serve: %w", err)
+		runErr = fmt.Errorf("serve: %w", err)
+		logger.Error("server failed; shutting down", "err", err)
 	case <-ctx.Done():
+		logger.Info("shutting down", "cause", context.Cause(ctx))
 	}
 	// Restore default signal handling so a second signal force-exits.
 	stop()
-	logger.Info("shutting down", "cause", context.Cause(ctx))
 
-	// Shutdown order: stop HTTP (drain, then force-close stragglers), then
-	// (later phases) stop workers, then close the store via the defer above.
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	// Shutdown order: HTTP (no new submissions), then workers (release
+	// leases), then the store (deferred above).
+	shutdownHTTP(logger, srv)
+	stopWorkers()
+	select {
+	case <-workersDone:
+	case <-time.After(workerShutdownTimeout):
+		// Deliberately carry on: the deferred store close runs under the
+		// stuck workers (their later calls fail with "database is closed"),
+		// and the process exits right after. SQLite's atomic commits keep the
+		// data consistent, and leftover leases are cleared at the next start.
+		logger.Error("workers did not stop in time; abandoning them", "timeout", workerShutdownTimeout)
+		runErr = errors.Join(runErr, errWorkersAbandoned)
+	}
+	logger.Info("stopped")
+	return runErr
+}
+
+var errWorkersAbandoned = errors.New("pipeline workers did not stop within the shutdown timeout")
+
+// lockDataDir takes an exclusive, non-blocking lock on a file in dir so two
+// phonetic processes can never share a data dir (the second would, for
+// example, release the first one's live leases). The lock is released by
+// unlock or automatically when the process exits.
+func lockDataDir(dir string) (unlock func(), err error) {
+	path := filepath.Join(dir, "phonetic.lock")
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return nil, fmt.Errorf("lock file: %w", err)
+	}
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		f.Close()
+		if errors.Is(err, syscall.EWOULDBLOCK) {
+			return nil, fmt.Errorf("data dir %s is in use by another phonetic process", dir)
+		}
+		return nil, fmt.Errorf("locking %s: %w", path, err)
+	}
+	return func() {
+		syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+		f.Close()
+	}, nil
+}
+
+// shutdownHTTP drains in-flight requests, then force-closes stragglers.
+func shutdownHTTP(logger *slog.Logger, srv *http.Server) {
+	ctx, cancel := context.WithTimeout(context.Background(), httpShutdownTimeout)
 	defer cancel()
-	if err := srv.Shutdown(shutdownCtx); err != nil {
+	err := srv.Shutdown(ctx)
+	switch {
+	case err == nil:
+		return
+	case errors.Is(err, context.DeadlineExceeded):
 		// Expected when a client is mid-download (e.g. a long audio file);
 		// not a failure of the service.
 		logger.Warn("graceful shutdown timed out; closing remaining connections", "err", err)
-		if err := srv.Close(); err != nil {
-			logger.Warn("closing server", "err", err)
-		}
+	default:
+		logger.Error("http shutdown", "err", err)
 	}
-	logger.Info("stopped")
-	return nil
+	if err := srv.Close(); err != nil {
+		logger.Warn("closing server", "err", err)
+	}
 }
 
 // version reports the module version the Go toolchain stamps from VCS state at
