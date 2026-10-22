@@ -14,20 +14,48 @@ type Pinger interface {
 	Ping(ctx context.Context) error
 }
 
-// Deps are the server's collaborators.
+// Deps are the server's collaborators and settings.
 type Deps struct {
-	Logger *slog.Logger
-	DB     Pinger
+	Logger   *slog.Logger
+	DB       Pinger
+	Articles ArticleStore
+	Notifier Notifier
+	// APIToken guards /api/. An empty token locks the API (nothing matches).
+	APIToken string
+	// Now returns the current time; nil means time.Now.
+	Now func() time.Time
+}
+
+func (d Deps) now() time.Time {
+	if d.Now != nil {
+		return d.Now()
+	}
+	return time.Now()
 }
 
 // healthTimeout bounds how long /healthz waits on the database. A variable so
 // tests can shorten it.
 var healthTimeout = 2 * time.Second
 
-// New returns the root handler for all routes.
+// New returns the root handler for all routes. With an empty APIToken the
+// API is locked (every /api/ request gets 401). With a token set, Articles and
+// Notifier are required; New panics without them, since that is a wiring bug.
 func New(d Deps) http.Handler {
+	if d.APIToken != "" && (d.Articles == nil || d.Notifier == nil) {
+		panic("server: APIToken is set but Articles or Notifier is nil")
+	}
+	auth := func(h http.Handler) http.Handler { return requireBearer(d.APIToken, h) }
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", handleHealthz(d.Logger, d.DB))
+	mux.Handle("POST /api/articles", auth(handleCreateArticle(d)))
+	mux.Handle("GET /api/articles", auth(handleListArticles(d)))
+	mux.Handle("GET /api/articles/{id}", auth(handleGetArticle(d)))
+	// Anything else under /api/ (unknown paths, other methods) gets auth and
+	// a JSON 404, instead of ServeMux's plain-text 404/405 without auth.
+	mux.Handle("/api/", auth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeError(w, http.StatusNotFound, "not found")
+	})))
 	return logRequests(d.Logger, mux)
 }
 
@@ -47,9 +75,16 @@ func handleHealthz(logger *slog.Logger, db Pinger) http.HandlerFunc {
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
+	h := w.Header()
+	h.Set("Content-Type", "application/json")
+	h.Set("Cache-Control", "no-store")
+	h.Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(status)
 	// The status is already sent; an encode error can only be a broken client
 	// connection, so there's nothing useful left to do with it.
 	_ = json.NewEncoder(w).Encode(v)
+}
+
+func writeError(w http.ResponseWriter, status int, msg string) {
+	writeJSON(w, status, map[string]string{"error": msg})
 }
