@@ -182,7 +182,8 @@ PHONETIC_DATA_DIR=/var/lib/phonetic
 PHONETIC_PUBLIC_URL=https://pc.tailnet-name.ts.net    # base for enclosure URLs
 PHONETIC_API_TOKEN=...
 PHONETIC_FEED_USER=... / PHONETIC_FEED_PASSWORD=...
-PHONETIC_WORKERS=2
+PHONETIC_WORKERS=2                     # 1-16
+PHONETIC_DEV_STUB_DELAY=0s             # temporary: stub stages sleep this long
 PHONETIC_RETENTION_DAYS=30
 PHONETIC_LLM=anthropic | none
 ANTHROPIC_API_KEY=...
@@ -271,7 +272,7 @@ Each phase ends with something that runs. The goal is to get end-to-end audio in
 - SQLite store with embedded migrations.
 - **Done when:** `make run` starts phonetic, creates the DB, serves `/healthz`; `make build-linux` produces a linux/amd64 binary.
 
-### Phase 1: Ingest and queue
+### Phase 1: Ingest and queue ✅
 - `POST/GET /api/articles` with bearer auth, URL normalization, deduplication.
 - Worker loop with leases, the state machine, retries and backoff, all running stub stages.
 - **Done when:** curl-posting a URL moves it through stub stages to `ready`, and a crash mid-job recovers.
@@ -281,6 +282,14 @@ Each phase ends with something that runs. The goal is to get end-to-end audio in
   - modernc's busy wait ignores context cancellation, so a blocked write can stall shutdown for up to `busy_timeout` (5s).
   - `server.New` takes a `Deps` struct; extend it rather than adding positional arguments. Add `http.MaxBytesReader` on JSON bodies.
   - E2E helpers take `testing.TB` per call; the harness has `restart`, `kill` and `waitForLog` ready for recovery tests.
+
+- Phase 1 outcome / notes for later phases:
+  - Pipeline: `internal/pipeline` Runner with worker **pools** (`Options.Pools`; each stage in exactly one pool), lease heartbeats, claim-time attempt counting, `Permanent` errors, panic recovery, and per-pool wake-ups (`Notify`, stage hand-offs). Phase 3: give synthesizing its own 1-worker pool.
+  - Stages get the claimed `store.Article`. Metadata they produce (title, word count, image importance...) must be written through **lease-guarded** store methods (CAS on `store.LeaseOf(a)`), not plain UPDATEs. Write stage files to a temp path and rename, so a superseded worker can't leave half-written outputs.
+  - `PHONETIC_DEV_STUB_DELAY` is a temporary test aid (marked `TODO(phase-3)`). Remove it once the stubs are gone, or switch E2E crash tests to slow fake servers.
+  - A data-dir `flock` enforces single-instance operation. `ReleaseAllLeases` at startup relies on it.
+  - Resubmitting a URL whose article failed returns 200 with `status: failed` (no requeue). Phase 7's reprocess endpoint handles retries; the Shortcut can show the returned status.
+  - Migrations are a small hand-rolled runner (`internal/store/migrate.go`). If the project gets serious, swap in `pressly/goose` or `golang-migrate`; only `store.Open` calls it.
 
 ### Phase 2: Fetch and extract
 - HTTP fetcher with timeouts, size limit, and the private-IP block.
