@@ -21,6 +21,25 @@ func openRaw(t *testing.T) *sql.DB {
 	return db
 }
 
+func openStore(t *testing.T) *Store {
+	t.Helper()
+	s, err := Open(context.Background(), filepath.Join(t.TempDir(), "phonetic.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+	return s
+}
+
+func mustSub(t *testing.T) fs.FS {
+	t.Helper()
+	sub, err := embeddedMigrationsFS()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return sub
+}
+
 func version(t *testing.T, db *sql.DB) int {
 	t.Helper()
 	v, err := userVersion(context.Background(), db)
@@ -158,123 +177,6 @@ func TestOpenConcurrentMigrations(t *testing.T) {
 	}
 }
 
-func TestMigrateAppliesInOrderAndResumes(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	db := openRaw(t)
-
-	fsys := fstest.MapFS{
-		"0001_a.sql": {Data: []byte("CREATE TABLE a (id INTEGER PRIMARY KEY);")},
-	}
-	if err := migrate(ctx, db, fsys); err != nil {
-		t.Fatal(err)
-	}
-	if got := version(t, db); got != 1 {
-		t.Fatalf("version = %d, want 1", got)
-	}
-
-	// A new binary ships an additional migration (multi-statement, and it
-	// depends on table a from the first).
-	fsys["0002_b.sql"] = &fstest.MapFile{Data: []byte(`
-		CREATE TABLE b (id INTEGER PRIMARY KEY, a_id INTEGER REFERENCES a(id));
-		CREATE INDEX b_a ON b (a_id);`)}
-	if err := migrate(ctx, db, fsys); err != nil {
-		t.Fatal(err)
-	}
-	if got := version(t, db); got != 2 {
-		t.Fatalf("version = %d, want 2", got)
-	}
-	if !tableExists(t, db, "b") {
-		t.Fatal("table b missing")
-	}
-}
-
-func TestMigrateFailureRollsBack(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	db := openRaw(t)
-
-	fsys := fstest.MapFS{
-		"0001_ok.sql":  {Data: []byte("CREATE TABLE ok (id INTEGER PRIMARY KEY);")},
-		"0002_bad.sql": {Data: []byte("CREATE TABLE half (id INTEGER PRIMARY KEY); THIS IS NOT SQL;")},
-	}
-	err := migrate(ctx, db, fsys)
-	if err == nil || !strings.Contains(err.Error(), "0002_bad.sql") {
-		t.Fatalf("err = %v, want failure naming 0002_bad.sql", err)
-	}
-	if got := version(t, db); got != 1 {
-		t.Errorf("version = %d, want 1 (failed migration must not bump it)", got)
-	}
-	if tableExists(t, db, "half") {
-		t.Error("partial migration was not rolled back")
-	}
-}
-
-func TestMigrateRejectsNewerDatabase(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	db := openRaw(t)
-	if _, err := db.Exec("PRAGMA user_version = 5"); err != nil {
-		t.Fatal(err)
-	}
-	fsys := fstest.MapFS{"0001_a.sql": {Data: []byte("SELECT 1;")}}
-	err := migrate(ctx, db, fsys)
-	if err == nil || !strings.Contains(err.Error(), "newer") {
-		t.Fatalf("err = %v, want 'newer than this binary' error", err)
-	}
-}
-
-func TestLoadMigrationsValidation(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name string
-		fsys fstest.MapFS
-	}{
-		{"gap", fstest.MapFS{"0001_a.sql": {}, "0003_c.sql": {}}},
-		{"duplicate version", fstest.MapFS{"0001_a.sql": {}, "0001_b.sql": {}}},
-		{"starts at 2", fstest.MapFS{"0002_a.sql": {}}},
-		{"bad name", fstest.MapFS{"1_a.sql": {}}},
-		{"uppercase name", fstest.MapFS{"0001_Create.sql": {}}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if _, err := loadMigrations(tt.fsys); err == nil {
-				t.Error("expected error")
-			}
-		})
-	}
-}
-
-func TestLoadMigrationsIgnoresNonSQL(t *testing.T) {
-	t.Parallel()
-	ms, err := loadMigrations(fstest.MapFS{"0001_a.sql": {}, "README.md": {}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(ms) != 1 {
-		t.Errorf("got %d migrations, want 1", len(ms))
-	}
-}
-
-func mustSub(t *testing.T) fs.FS {
-	t.Helper()
-	sub, err := embeddedMigrationsFS()
-	if err != nil {
-		t.Fatal(err)
-	}
-	return sub
-}
-
-func openStore(t *testing.T) *Store {
-	t.Helper()
-	s, err := Open(context.Background(), filepath.Join(t.TempDir(), "phonetic.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { s.Close() })
-	return s
-}
-
 // _txlock=immediate: a second write transaction must wait for the first rather
 // than start (and later fail on lock upgrade).
 func TestWriteTransactionsAreImmediate(t *testing.T) {
@@ -377,5 +279,103 @@ func TestArticleIDsAreNeverReused(t *testing.T) {
 	}
 	if second := insert("https://example.com/2"); second == first {
 		t.Errorf("id %d was reused after delete", first)
+	}
+}
+
+func TestMigrateAppliesInOrderAndResumes(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db := openRaw(t)
+
+	fsys := fstest.MapFS{
+		"0001_a.sql": {Data: []byte("CREATE TABLE a (id INTEGER PRIMARY KEY);")},
+	}
+	if err := migrate(ctx, db, fsys); err != nil {
+		t.Fatal(err)
+	}
+	if got := version(t, db); got != 1 {
+		t.Fatalf("version = %d, want 1", got)
+	}
+
+	// A new binary ships an additional migration (multi-statement, and it
+	// depends on table a from the first).
+	fsys["0002_b.sql"] = &fstest.MapFile{Data: []byte(`
+		CREATE TABLE b (id INTEGER PRIMARY KEY, a_id INTEGER REFERENCES a(id));
+		CREATE INDEX b_a ON b (a_id);`)}
+	if err := migrate(ctx, db, fsys); err != nil {
+		t.Fatal(err)
+	}
+	if got := version(t, db); got != 2 {
+		t.Fatalf("version = %d, want 2", got)
+	}
+	if !tableExists(t, db, "b") {
+		t.Fatal("table b missing")
+	}
+}
+
+func TestMigrateFailureRollsBack(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db := openRaw(t)
+
+	fsys := fstest.MapFS{
+		"0001_ok.sql":  {Data: []byte("CREATE TABLE ok (id INTEGER PRIMARY KEY);")},
+		"0002_bad.sql": {Data: []byte("CREATE TABLE half (id INTEGER PRIMARY KEY); THIS IS NOT SQL;")},
+	}
+	err := migrate(ctx, db, fsys)
+	if err == nil || !strings.Contains(err.Error(), "0002_bad.sql") {
+		t.Fatalf("err = %v, want failure naming 0002_bad.sql", err)
+	}
+	if got := version(t, db); got != 1 {
+		t.Errorf("version = %d, want 1 (failed migration must not bump it)", got)
+	}
+	if tableExists(t, db, "half") {
+		t.Error("partial migration was not rolled back")
+	}
+}
+
+func TestMigrateRejectsNewerDatabase(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db := openRaw(t)
+	if _, err := db.Exec("PRAGMA user_version = 5"); err != nil {
+		t.Fatal(err)
+	}
+	fsys := fstest.MapFS{"0001_a.sql": {Data: []byte("SELECT 1;")}}
+	err := migrate(ctx, db, fsys)
+	if err == nil || !strings.Contains(err.Error(), "newer") {
+		t.Fatalf("err = %v, want 'newer than this binary' error", err)
+	}
+}
+
+func TestLoadMigrationsValidation(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		fsys fstest.MapFS
+	}{
+		{"gap", fstest.MapFS{"0001_a.sql": {}, "0003_c.sql": {}}},
+		{"duplicate version", fstest.MapFS{"0001_a.sql": {}, "0001_b.sql": {}}},
+		{"starts at 2", fstest.MapFS{"0002_a.sql": {}}},
+		{"bad name", fstest.MapFS{"1_a.sql": {}}},
+		{"uppercase name", fstest.MapFS{"0001_Create.sql": {}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := loadMigrations(tt.fsys); err == nil {
+				t.Error("expected error")
+			}
+		})
+	}
+}
+
+func TestLoadMigrationsIgnoresNonSQL(t *testing.T) {
+	t.Parallel()
+	ms, err := loadMigrations(fstest.MapFS{"0001_a.sql": {}, "README.md": {}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ms) != 1 {
+		t.Errorf("got %d migrations, want 1", len(ms))
 	}
 }

@@ -19,6 +19,31 @@ type fakePinger struct{ err error }
 
 func (f fakePinger) Ping(context.Context) error { return f.err }
 
+// hangingPinger blocks until the context ends, like an unresponsive database.
+type hangingPinger struct{}
+
+func (hangingPinger) Ping(ctx context.Context) error {
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
 func newTestServer(t *testing.T, db Pinger) (*httptest.Server, *bytes.Buffer) {
 	t.Helper()
 	var logs bytes.Buffer
@@ -65,6 +90,26 @@ func TestHealthz(t *testing.T) {
 				t.Errorf("ping error not logged; logs:\n%s", logs)
 			}
 		})
+	}
+}
+
+func TestHealthzTimesOutOnHangingDB(t *testing.T) {
+	old := healthTimeout
+	healthTimeout = 50 * time.Millisecond
+	t.Cleanup(func() { healthTimeout = old })
+
+	srv, _ := newTestServer(t, hangingPinger{})
+	start := time.Now()
+	resp, err := http.Get(srv.URL + "/healthz")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Errorf("status = %d, want 503", resp.StatusCode)
+	}
+	if elapsed := time.Since(start); elapsed > time.Second {
+		t.Errorf("healthz took %s; timeout not applied", elapsed)
 	}
 }
 
@@ -118,49 +163,6 @@ func TestLogRequestsRecordsStatusAndBytes(t *testing.T) {
 	}
 }
 
-func TestStatusWriterImplicitOKAndReadFrom(t *testing.T) {
-	rec := httptest.NewRecorder()
-	sw := &statusWriter{ResponseWriter: rec, status: http.StatusOK}
-	n, err := sw.ReadFrom(strings.NewReader("abcdef"))
-	if err != nil || n != 6 {
-		t.Fatalf("ReadFrom = %d, %v", n, err)
-	}
-	if sw.status != http.StatusOK || sw.bytes != 6 || rec.Body.String() != "abcdef" {
-		t.Errorf("status=%d bytes=%d body=%q", sw.status, sw.bytes, rec.Body.String())
-	}
-	if http.NewResponseController(sw).Flush() != nil {
-		t.Error("Flush via ResponseController should reach the recorder")
-	}
-}
-
-// hangingPinger blocks until the context ends, like an unresponsive database.
-type hangingPinger struct{}
-
-func (hangingPinger) Ping(ctx context.Context) error {
-	<-ctx.Done()
-	return ctx.Err()
-}
-
-func TestHealthzTimesOutOnHangingDB(t *testing.T) {
-	old := healthTimeout
-	healthTimeout = 50 * time.Millisecond
-	t.Cleanup(func() { healthTimeout = old })
-
-	srv, _ := newTestServer(t, hangingPinger{})
-	start := time.Now()
-	resp, err := http.Get(srv.URL + "/healthz")
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusServiceUnavailable {
-		t.Errorf("status = %d, want 503", resp.StatusCode)
-	}
-	if elapsed := time.Since(start); elapsed > time.Second {
-		t.Errorf("healthz took %s; timeout not applied", elapsed)
-	}
-}
-
 func TestLogRequestsLogsPanickingHandler(t *testing.T) {
 	var logs bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(&logs, nil))
@@ -208,19 +210,17 @@ func TestLogRequestsIgnoresInformationalStatus(t *testing.T) {
 	}
 }
 
-type syncBuffer struct {
-	mu  sync.Mutex
-	buf bytes.Buffer
-}
-
-func (b *syncBuffer) Write(p []byte) (int, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return b.buf.Write(p)
-}
-
-func (b *syncBuffer) String() string {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return b.buf.String()
+func TestStatusWriterImplicitOKAndReadFrom(t *testing.T) {
+	rec := httptest.NewRecorder()
+	sw := &statusWriter{ResponseWriter: rec, status: http.StatusOK}
+	n, err := sw.ReadFrom(strings.NewReader("abcdef"))
+	if err != nil || n != 6 {
+		t.Fatalf("ReadFrom = %d, %v", n, err)
+	}
+	if sw.status != http.StatusOK || sw.bytes != 6 || rec.Body.String() != "abcdef" {
+		t.Errorf("status=%d bytes=%d body=%q", sw.status, sw.bytes, rec.Body.String())
+	}
+	if http.NewResponseController(sw).Flush() != nil {
+		t.Error("Flush via ResponseController should reach the recorder")
+	}
 }

@@ -67,11 +67,29 @@ const (
 	waitDelay = 5 * time.Second
 )
 
+// passthroughEnv lists the only parent environment variables the child
+// inherits. An allowlist keeps a developer's shell (API keys, base URLs) from
+// leaking into tests.
+var passthroughEnv = []string{"PATH", "HOME", "TMPDIR", "GORACE", "GOCOVERDIR"}
+
 // options customize an instance. Zero values pick sensible defaults.
 type options struct {
 	DataDir string            // default: fresh t.TempDir()
 	Addr    string            // default: a free localhost port
 	Env     map[string]string // extra/overriding variables
+}
+
+// exitStatus describes how the process ended.
+type exitStatus struct {
+	Code   int            // exit code; -1 if killed by a signal
+	Signal syscall.Signal // terminating signal, if any
+}
+
+func (s exitStatus) String() string {
+	if s.Signal != 0 {
+		return "killed by " + s.Signal.String()
+	}
+	return fmt.Sprintf("exit code %d", s.Code)
 }
 
 // instance is one running phonetic process.
@@ -89,19 +107,6 @@ type instance struct {
 	logs    *syncBuffer
 	exited  chan struct{}
 	waitErr error
-}
-
-// exitStatus describes how the process ended.
-type exitStatus struct {
-	Code   int            // exit code; -1 if killed by a signal
-	Signal syscall.Signal // terminating signal, if any
-}
-
-func (s exitStatus) String() string {
-	if s.Signal != 0 {
-		return "killed by " + s.Signal.String()
-	}
-	return fmt.Sprintf("exit code %d", s.Code)
 }
 
 // start launches phonetic and waits until it is serving.
@@ -186,26 +191,6 @@ func launch(t testing.TB, opts options) *instance {
 		}
 	})
 	return inst
-}
-
-// passthroughEnv lists the only parent environment variables the child
-// inherits. An allowlist keeps a developer's shell (API keys, base URLs) from
-// leaking into tests.
-var passthroughEnv = []string{"PATH", "HOME", "TMPDIR", "GORACE", "GOCOVERDIR"}
-
-func buildEnv(env map[string]string) []string {
-	var out []string
-	for _, k := range passthroughEnv {
-		if v, ok := os.LookupEnv(k); ok {
-			if _, overridden := env[k]; !overridden {
-				out = append(out, k+"="+v)
-			}
-		}
-	}
-	for k, v := range env {
-		out = append(out, k+"="+v)
-	}
-	return out
 }
 
 // waitReady waits for this process's own "listening" log line (proving the
@@ -336,18 +321,6 @@ func (i *instance) get(t testing.TB, path string) *http.Response {
 // Logs returns everything the process has written so far.
 func (i *instance) Logs() string { return i.logs.String() }
 
-// freeAddr returns a localhost address with a currently-free port. Another
-// process can take it before phonetic binds; start() detects and retries.
-func freeAddr(t testing.TB) string {
-	t.Helper()
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer ln.Close()
-	return ln.Addr().String()
-}
-
 // syncBuffer is a goroutine-safe bytes.Buffer for capturing process output.
 type syncBuffer struct {
 	mu  sync.Mutex
@@ -364,4 +337,31 @@ func (b *syncBuffer) String() string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return b.buf.String()
+}
+
+func buildEnv(env map[string]string) []string {
+	var out []string
+	for _, k := range passthroughEnv {
+		if v, ok := os.LookupEnv(k); ok {
+			if _, overridden := env[k]; !overridden {
+				out = append(out, k+"="+v)
+			}
+		}
+	}
+	for k, v := range env {
+		out = append(out, k+"="+v)
+	}
+	return out
+}
+
+// freeAddr returns a localhost address with a currently-free port. Another
+// process can take it before phonetic binds; start() detects and retries.
+func freeAddr(t testing.TB) string {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	return ln.Addr().String()
 }

@@ -19,6 +19,9 @@ import (
 	"github.com/tony-montemuro/phonetic/internal/store"
 )
 
+// shutdownTimeout bounds how long in-flight requests get to finish.
+const shutdownTimeout = 10 * time.Second
+
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, "phonetic:", err)
@@ -96,9 +99,6 @@ func run() error {
 	logger.Info("stopped")
 	return nil
 }
-
-// shutdownTimeout bounds how long in-flight requests get to finish.
-const shutdownTimeout = 10 * time.Second
 
 // version reports the module version the Go toolchain stamps from VCS state at
 // build time, e.g. "v0.0.0-20261020011846-fb030f8626ff+dirty".

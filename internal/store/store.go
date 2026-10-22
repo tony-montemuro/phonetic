@@ -55,6 +55,16 @@ func Open(ctx context.Context, path string) (*Store, error) {
 	return &Store{db: db}, nil
 }
 
+// Ping verifies the database is reachable.
+func (s *Store) Ping(ctx context.Context) error {
+	return s.db.PingContext(ctx)
+}
+
+// Close closes the underlying database.
+func (s *Store) Close() error {
+	return s.db.Close()
+}
+
 // dsn builds a modernc.org/sqlite connection string. The connection
 // parameters are applied by the driver to every pooled connection:
 //   - WAL lets readers proceed while a writer is active; synchronous=NORMAL is
@@ -79,14 +89,4 @@ func dsn(path string) string {
 	q.Set("_txlock", "immediate")
 	// The driver splits the name at the first '?', so path must not contain one.
 	return path + "?" + q.Encode()
-}
-
-// Ping verifies the database is reachable.
-func (s *Store) Ping(ctx context.Context) error {
-	return s.db.PingContext(ctx)
-}
-
-// Close closes the underlying database.
-func (s *Store) Close() error {
-	return s.db.Close()
 }

@@ -12,6 +12,12 @@ import (
 	"strings"
 )
 
+// Defaults suitable for local development.
+const (
+	DefaultAddr    = "127.0.0.1:8080"
+	DefaultDataDir = "data"
+)
+
 // Config is the fully-resolved runtime configuration.
 type Config struct {
 	// Addr is the TCP address the HTTP server listens on (host:port).
@@ -22,12 +28,6 @@ type Config struct {
 	// LogLevel is the minimum level that gets logged.
 	LogLevel slog.Level
 }
-
-// Defaults suitable for local development.
-const (
-	DefaultAddr    = "127.0.0.1:8080"
-	DefaultDataDir = "data"
-)
 
 // Load builds a Config from the given environment lookup function (normally
 // os.Getenv). Unset or blank variables fall back to defaults. All problems are
