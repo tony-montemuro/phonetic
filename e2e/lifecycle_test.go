@@ -18,6 +18,16 @@ import (
 // shutdown that falls back to force-closing can't pass as graceful.
 const gracefulWait = 5 * time.Second
 
+// assertHealthy checks /healthz, which pings the database, returns 200.
+func assertHealthy(t testing.TB, inst *instance) {
+	t.Helper()
+	resp := inst.get(t, "/healthz")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("healthz status = %d, want 200", resp.StatusCode)
+	}
+	resp.Body.Close()
+}
+
 func TestServesHealthzAndShutsDownGracefully(t *testing.T) {
 	t.Parallel()
 	inst := start(t, options{})
@@ -62,11 +72,13 @@ func TestRestartAfterCleanStopAndCrash(t *testing.T) {
 		t.Fatalf("clean stop: %s", st)
 	}
 	inst = inst.restart(t)
+	assertHealthy(t, inst)
 
 	if st := inst.kill(t); st.Signal != syscall.SIGKILL {
 		t.Fatalf("kill: %s, want killed by SIGKILL", st)
 	}
 	inst = inst.restart(t)
+	assertHealthy(t, inst) // database usable after an unclean stop
 
 	if _, err := os.Stat(filepath.Join(inst.DataDir, "phonetic.db")); err != nil {
 		t.Fatalf("database file: %v", err)

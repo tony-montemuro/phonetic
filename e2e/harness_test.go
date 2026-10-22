@@ -11,10 +11,8 @@ package e2e
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"os"
@@ -109,7 +107,7 @@ type instance struct {
 	waitErr error
 }
 
-// start launches phonetic and waits until it is serving.
+// start launches phonetic and waits until it is listening (see waitReady).
 func start(t testing.TB, opts options) *instance {
 	t.Helper()
 	const attempts = 3
@@ -193,31 +191,14 @@ func launch(t testing.TB, opts options) *instance {
 	return inst
 }
 
-// waitReady waits for this process's own "listening" log line (proving the
-// port is ours, not another instance's), then for /healthz to return 200.
+// waitReady waits for this process's own "listening" log line. That alone
+// means ready: phonetic opens the database before binding, and once the port
+// is bound the kernel queues connections until Serve accepts them. It also
+// proves the port is ours, not another instance's. Readiness deliberately
+// doesn't use /healthz, so the endpoint stays independently tested.
 func (i *instance) waitReady(t testing.TB, timeout time.Duration) error {
 	t.Helper()
-	deadline := time.Now().Add(timeout)
-	if err := i.waitForLog(t, "msg=listening addr="+i.Addr, timeout); err != nil {
-		return err
-	}
-	for {
-		ctx, cancel := context.WithDeadline(context.Background(), deadline)
-		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, i.BaseURL+"/healthz", nil)
-		resp, err := i.Client.Do(req)
-		if err == nil {
-			io.Copy(io.Discard, resp.Body)
-			resp.Body.Close()
-		}
-		cancel()
-		if err == nil && resp.StatusCode == http.StatusOK {
-			return nil
-		}
-		if time.Now().After(deadline) {
-			return fmt.Errorf("/healthz not OK after %s (last err: %v)", timeout, err)
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
+	return i.waitForLog(t, "msg=listening addr="+i.Addr, timeout)
 }
 
 // waitForLog polls the process output until it contains substr. It fails fast
