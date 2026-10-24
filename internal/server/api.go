@@ -2,9 +2,9 @@ package server
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
-	"io"
 	"net/http"
 	"strconv"
 	"time"
@@ -79,7 +79,7 @@ func handleCreateArticle(d Deps) http.HandlerFunc {
 				writeError(w, http.StatusRequestEntityTooLarge, "request body too large")
 				return
 			}
-			writeError(w, http.StatusBadRequest, "body must be exactly {\"url\": \"https://...\"}: "+err.Error())
+			writeError(w, http.StatusBadRequest, badBodyMessage(err))
 			return
 		}
 		url, err := urlnorm.Normalize(req.URL)
@@ -157,7 +157,7 @@ func handleListArticles(d Deps) http.HandlerFunc {
 			writeError(w, http.StatusInternalServerError, "internal error")
 			return
 		}
-		out := make([]articleJSON, len(as)) // non-nil: encodes as [] when empty
+		out := make([]articleJSON, len(as))
 		for i, a := range as {
 			out[i] = toArticleJSON(a)
 		}
@@ -165,22 +165,26 @@ func handleListArticles(d Deps) http.HandlerFunc {
 	}
 }
 
-// decodeJSON strictly decodes a bounded JSON body into v: unknown fields and
-// trailing data are rejected.
+// decodeJSON strictly decodes a bounded JSON body into v. encoding/json/v2
+// already rejects trailing data and duplicate keys and matches names
+// case-sensitively; unknown fields are rejected too.
 func decodeJSON(w http.ResponseWriter, r *http.Request, v any) error {
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(v); err != nil {
-		return err
+	return json.UnmarshalRead(http.MaxBytesReader(w, r.Body, maxBodyBytes), v,
+		json.RejectUnknownMembers(true))
+}
+
+// badBodyMessage maps a decode error to a fixed, client-friendly message
+// (the raw errors name Go types).
+func badBodyMessage(err error) string {
+	const want = `body must be exactly {"url": "https://..."}`
+	switch {
+	case errors.Is(err, json.ErrUnknownName):
+		return want + ": unknown field"
+	case errors.Is(err, jsontext.ErrDuplicateName):
+		return want + ": duplicate field"
+	default:
+		return want + ": malformed JSON"
 	}
-	if err := dec.Decode(&struct{}{}); err != io.EOF {
-		var tooBig *http.MaxBytesError
-		if errors.As(err, &tooBig) {
-			return err
-		}
-		return errors.New("unexpected data after the JSON object")
-	}
-	return nil
 }
 
 // parseID parses a positive decimal ID, accepting only its canonical

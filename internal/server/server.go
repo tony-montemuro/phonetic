@@ -3,7 +3,8 @@ package server
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"log/slog"
 	"net/http"
 	"time"
@@ -74,15 +75,23 @@ func handleHealthz(logger *slog.Logger, db Pinger) http.HandlerFunc {
 	}
 }
 
+// writeJSON marshals v completely before sending anything, so an encoding
+// failure becomes a clean 500 instead of a truncated body under an
+// already-sent status. Invalid UTF-8 (e.g. from a scraped page) is replaced
+// with U+FFFD, as encoding/json v1 did; Deterministic sorts map keys.
 func writeJSON(w http.ResponseWriter, status int, v any) {
+	body, err := json.Marshal(v, json.Deterministic(true), jsontext.AllowInvalidUTF8(true))
+	if err != nil {
+		slog.Error("encoding JSON response", "err", err)
+		status, body = http.StatusInternalServerError, []byte(`{"error":"internal error"}`)
+	}
 	h := w.Header()
 	h.Set("Content-Type", "application/json")
 	h.Set("Cache-Control", "no-store")
 	h.Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(status)
-	// The status is already sent; an encode error can only be a broken client
-	// connection, so there's nothing useful left to do with it.
-	_ = json.NewEncoder(w).Encode(v)
+	// A write error here can only be a broken client connection.
+	_, _ = w.Write(body)
 }
 
 func writeError(w http.ResponseWriter, status int, msg string) {

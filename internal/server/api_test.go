@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/tony-montemuro/phonetic/internal/store"
 )
@@ -35,6 +36,14 @@ func (failingArticles) GetArticle(context.Context, int64) (store.Article, error)
 }
 func (failingArticles) ListArticles(context.Context, store.ListOptions) ([]store.Article, error) {
 	return nil, errors.New("disk on fire")
+}
+
+// badTitleArticles returns an article whose title holds invalid UTF-8, as
+// text scraped from a page might.
+type badTitleArticles struct{ failingArticles }
+
+func (badTitleArticles) GetArticle(_ context.Context, id int64) (store.Article, error) {
+	return store.Article{ID: id, URL: "https://example.com/a", Status: store.StatusReady, Title: "bad\xff title"}, nil
 }
 
 // apiClient wraps a test server running the full handler against a real store.
@@ -101,7 +110,9 @@ func (c *apiClient) doWithAuth(method, path, body, auth string, out any) *http.R
 	return resp
 }
 
-type errorBody struct{ Error string }
+type errorBody struct {
+	Error string `json:"error"`
+}
 
 func itoa(n int64) string { return strconv.FormatInt(n, 10) }
 
@@ -156,6 +167,9 @@ func TestCreateArticleRejectsBadInput(t *testing.T) {
 		{"typo field", `{"ur1": "https://example.com/a"}`, http.StatusBadRequest},
 		{"trailing data", `{"url": "https://example.com/a"} garbage`, http.StatusBadRequest},
 		{"two objects", `{"url": "https://example.com/a"}{"url": "https://example.com/b"}`, http.StatusBadRequest},
+		{"duplicate key", `{"url": "https://example.com/a", "url": "https://example.com/b"}`, http.StatusBadRequest},
+		{"wrong case key", `{"URL": "https://example.com/a"}`, http.StatusBadRequest},
+		{"empty body", ``, http.StatusBadRequest},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -393,5 +407,57 @@ func TestParseID(t *testing.T) {
 		if _, ok := parseID(raw); ok {
 			t.Errorf("parseID(%q) should fail", raw)
 		}
+	}
+}
+
+func TestBadBodyMessagesAreFriendly(t *testing.T) {
+	t.Parallel()
+	c := newAPIClient(t, nil)
+	for body, want := range map[string]string{
+		`{"url": "https://example.com/a", "extra": 1}`:              "unknown field",
+		`{"url": "https://example.com/a", "url": "https://x.com/"}`: "duplicate field",
+		`{"url": `: "malformed JSON",
+	} {
+		var e errorBody
+		c.do("POST", "/api/articles", body, &e)
+		if !strings.HasSuffix(e.Error, want) || strings.Contains(e.Error, "struct") {
+			t.Errorf("body %q: error %q, want a fixed message ending in %q", body, e.Error, want)
+		}
+	}
+}
+
+// Text stored from scraped pages may contain invalid UTF-8. Responses must
+// still be complete, valid JSON (with U+FFFD), not a truncated body.
+func TestInvalidUTF8InStoredFieldsIsSafe(t *testing.T) {
+	t.Parallel()
+	c := newAPIClient(t, badTitleArticles{})
+	a := articleJSON{ID: 1}
+
+	req, _ := http.NewRequest("GET", c.srv.URL+"/api/articles/"+itoa(a.ID), nil)
+	req.Header.Set("Authorization", "Bearer "+testToken)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK || !utf8.Valid(raw) || !json.Valid(raw) {
+		t.Fatalf("status %d, body %q: want 200 with complete, valid UTF-8 JSON", resp.StatusCode, raw)
+	}
+	var got articleJSON
+	if err := json.Unmarshal(raw, &got); err != nil || got.Title != "bad\uFFFD title" {
+		t.Errorf("title = %q (err %v), want invalid byte replaced with U+FFFD", got.Title, err)
+	}
+}
+
+func TestWriteJSONEncodingFailureIs500(t *testing.T) {
+	t.Parallel()
+	rec := httptest.NewRecorder()
+	writeJSON(rec, http.StatusOK, map[string]any{"bad": make(chan int)})
+	if rec.Code != http.StatusInternalServerError || !json.Valid(rec.Body.Bytes()) {
+		t.Errorf("status %d body %q, want 500 with a JSON error", rec.Code, rec.Body.String())
 	}
 }
