@@ -12,6 +12,9 @@ import (
 // real stages one by one.
 func StubStages(delay time.Duration) map[store.Status]Stage {
 	stub := StageFunc(func(ctx context.Context, _ store.Article) error {
+		if err := ctx.Err(); err != nil {
+			return err // honor the Stage contract even with no delay
+		}
 		if delay <= 0 {
 			return nil
 		}

@@ -615,3 +615,35 @@ func TestPermanent(t *testing.T) {
 		t.Error("unexpected IsPermanent/Permanent(nil) behavior")
 	}
 }
+
+// An article claimed after shutdown began is handed back uncounted, without
+// running its stage. Driven directly through process, since the window in
+// which a real claim races shutdown is tiny.
+func TestClaimDuringShutdownIsReleasedNotRun(t *testing.T) {
+	t.Parallel()
+	s := openStore(t)
+	id := insert(t, s, "https://example.com/a")
+	never := newCountingStage(nil)
+	r, err := New(s, stagesWith(store.StatusFetching, never), slog.New(slog.NewTextHandler(io.Discard, nil)), fastOpts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err := s.ClaimArticle(context.Background(), time.Now(), fastOpts.Lease)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // shutdown already under way
+	r.process(ctx, r.logger, a)
+
+	if n := never.count(id); n != 0 {
+		t.Errorf("stage ran %d times after shutdown began", n)
+	}
+	got, err := s.GetArticle(context.Background(), id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != store.StatusFetching || got.Attempts != 0 || !got.LockedUntil.IsZero() {
+		t.Errorf("after release: %+v (want fetching, 0 attempts, unleased)", got)
+	}
+}

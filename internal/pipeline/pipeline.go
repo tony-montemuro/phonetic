@@ -236,6 +236,19 @@ func (r *Runner) process(ctx context.Context, logger *slog.Logger, a store.Artic
 		return
 	}
 
+	// The claim ran on a non-cancellable context, so shutdown may have begun
+	// while it was in flight (e.g. it picked up the next stage of an article
+	// another worker just finished during shutdown). Don't start new work:
+	// hand it back uncounted. This narrows rather than closes the gap: a
+	// stage can still start with a just-cancelled ctx, which is safe because
+	// stages must honor ctx.
+	if ctx.Err() != nil {
+		r.write(logger, "claimed during shutdown; lease released", func(ctx context.Context) error {
+			return r.store.ReleaseLease(ctx, lease, time.Now())
+		})
+		return
+	}
+
 	logger.Info("stage started")
 	start := time.Now()
 	stageCtx, cancel := context.WithCancelCause(ctx)
