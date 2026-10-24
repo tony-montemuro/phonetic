@@ -199,7 +199,7 @@ The user develops on macOS (Apple Silicon, `darwin/arm64`). The service runs on 
 
 | | macOS (dev) | Arch (prod) |
 |---|---|---|
-| Go | ✅ go1.27 installed | not needed (binary is cross-compiled) |
+| Go | ✅ go1.27.3. `go.mod` requires ≥ 1.27.3 (crypto security fix). With the default `GOTOOLCHAIN=auto` an older `go` downloads 1.27.3; with `GOTOOLCHAIN=local` it refuses to build | not needed (binary is cross-compiled). The Go version is baked into the binary at build time, so rebuild and redeploy after toolchain security bumps. Check with `go version -m /usr/local/bin/phonetic` |
 | ffmpeg | ✅ installed (Homebrew) | `pacman -S ffmpeg` |
 | Docker | ✅ Docker Desktop (Kokoro on CPU) | `docker` + `nvidia-container-toolkit` (Kokoro on GPU) |
 | Tailscale | later | required (Phase 4) |
