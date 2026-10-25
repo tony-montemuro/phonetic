@@ -1,0 +1,133 @@
+// Package stages implements the real pipeline stages. Each reads the
+// previous stage's artifacts from the article's directory and writes its own
+// (see internal/artifact), so any stage can be re-run on its own.
+package stages
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io/fs"
+	"net/url"
+	"time"
+
+	"github.com/tony-montemuro/phonetic/internal/artifact"
+	"github.com/tony-montemuro/phonetic/internal/extract"
+	"github.com/tony-montemuro/phonetic/internal/fetch"
+	"github.com/tony-montemuro/phonetic/internal/pipeline"
+	"github.com/tony-montemuro/phonetic/internal/store"
+)
+
+// FetchMeta is the content of fetch.json.
+type FetchMeta struct {
+	// URL is the final URL after redirects.
+	URL                 string    `json:"url"`
+	ContentType         string    `json:"content_type"`
+	OriginalContentType string    `json:"original_content_type"`
+	FetchedAt           time.Time `json:"fetched_at"`
+}
+
+// Fetcher downloads pages (*fetch.Fetcher implements it).
+type Fetcher interface {
+	Fetch(ctx context.Context, rawURL string) (fetch.Result, error)
+}
+
+// Fetch downloads the article page into raw.html and fetch.json.
+type Fetch struct {
+	Fetcher Fetcher
+	DataDir string
+}
+
+// Run implements pipeline.Stage.
+func (s Fetch) Run(ctx context.Context, a store.Article) error {
+	res, err := s.Fetcher.Fetch(ctx, a.URL)
+	if err != nil {
+		err = fmt.Errorf("fetching: %w", err)
+		if fetch.IsPermanent(err) {
+			return pipeline.Permanent(err)
+		}
+		return err
+	}
+	dir := artifact.For(s.DataDir, a.ID)
+	if err := dir.WriteFile(artifact.RawHTML, res.Body); err != nil {
+		return fmt.Errorf("saving page: %w", err)
+	}
+	meta := FetchMeta{
+		URL:                 res.URL,
+		ContentType:         res.ContentType,
+		OriginalContentType: res.OriginalContentType,
+		FetchedAt:           res.FetchedAt.UTC(),
+	}
+	if err := dir.WriteJSON(artifact.FetchMeta, meta); err != nil {
+		return fmt.Errorf("saving fetch metadata: %w", err)
+	}
+	return nil
+}
+
+// MetadataStore records extraction results (*store.Store implements it).
+type MetadataStore interface {
+	SaveExtracted(ctx context.Context, l store.Lease, m store.ExtractedMetadata, now time.Time) error
+}
+
+// Extract turns raw.html into extracted.json and records the article's
+// metadata (title, author, word and image counts...) in the store.
+type Extract struct {
+	Store   MetadataStore
+	DataDir string
+	// Now returns the current time; nil means time.Now.
+	Now func() time.Time
+}
+
+// Run implements pipeline.Stage.
+func (s Extract) Run(ctx context.Context, a store.Article) error {
+	dir := artifact.For(s.DataDir, a.ID)
+	var meta FetchMeta
+	if err := dir.ReadJSON(artifact.FetchMeta, &meta); err != nil {
+		return missingInput(err)
+	}
+	page, err := dir.ReadFile(artifact.RawHTML)
+	if err != nil {
+		return missingInput(err)
+	}
+	pageURL, err := url.Parse(meta.URL)
+	if err != nil {
+		return pipeline.Permanent(fmt.Errorf("bad final URL in %s: %w", artifact.FetchMeta, err))
+	}
+
+	art, err := extract.Extract(page, pageURL)
+	if errors.Is(err, extract.ErrNoContent) {
+		return pipeline.Permanent(err)
+	}
+	if err != nil {
+		return err
+	}
+	if err := dir.WriteJSON(artifact.Extracted, art); err != nil {
+		return fmt.Errorf("saving extraction: %w", err)
+	}
+	return s.Store.SaveExtracted(ctx, store.LeaseOf(a), store.ExtractedMetadata{
+		Title:       art.Title,
+		Author:      art.Byline,
+		SiteName:    art.SiteName,
+		PublishedAt: art.PublishedAt,
+		WordCount:   art.WordCount,
+		ImageCount:  len(art.Images),
+	}, s.now())
+}
+
+func (s Extract) now() time.Time {
+	if s.Now != nil {
+		return s.Now()
+	}
+	return time.Now()
+}
+
+// missingInput classifies a failure to read the fetch stage's output. A
+// missing file won't appear by retrying extract (the article needs
+// re-fetching), so that's permanent; other read errors may be transient.
+func missingInput(err error) error {
+	err = fmt.Errorf("reading fetch output: %w", err)
+	if errors.Is(err, fs.ErrNotExist) {
+		return pipeline.Permanent(err)
+	}
+	return err
+}
