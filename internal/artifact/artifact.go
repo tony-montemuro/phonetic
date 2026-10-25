@@ -10,7 +10,7 @@
 // Atomic writes prevent torn files, not stale ones: a worker that lost its
 // lease can still rename its (complete) output over the new owner's. That's
 // harmless because stages are idempotent and re-runnable. A crash between
-// creating a temp file and renaming it leaves a hidden ".<name>.tmp-*" file
+// creating a temp file and renaming it leaves a hidden ".tmp-*-<name>" file
 // behind; it is never read and goes away when the article's directory is
 // removed.
 package artifact
@@ -20,6 +20,7 @@ import (
 	"encoding/json/v2"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -30,6 +31,9 @@ const (
 	RawHTML   = "raw.html"       // fetch output, converted to UTF-8
 	FetchMeta = "fetch.json"     // fetch metadata (final URL, content type, time)
 	Extracted = "extracted.json" // extract output
+	Script    = "script.txt"     // text to speak (script stage output)
+	Audio     = "audio.mp3"      // the episode (synthesize stage output)
+	Chunks    = "chunks"         // subdirectory of per-chunk TTS audio (intermediate)
 )
 
 // ErrBadName is returned for file names that aren't a single plain path
@@ -57,6 +61,12 @@ func (d Dir) Path(name string) string {
 	return filepath.Join(d.path, name)
 }
 
+// Sub returns the subdirectory name of d (not created until written to). It
+// panics if name isn't a single file name, like Path.
+func (d Dir) Sub(name string) Dir {
+	return Dir{path: d.Path(name)}
+}
+
 // WriteFile atomically and durably writes data to name, creating the
 // directory if needed.
 func (d Dir) WriteFile(name string, data []byte) error {
@@ -64,6 +74,36 @@ func (d Dir) WriteFile(name string, data []byte) error {
 		_, err := f.Write(data)
 		return err
 	})
+}
+
+// WriteStream atomically and durably writes name from a function that
+// streams into it (e.g. an HTTP response body). If write fails, nothing is
+// renamed into place.
+func (d Dir) WriteStream(name string, write func(io.Writer) error) error {
+	return d.writeAtomic(name, func(f *os.File) error { return write(f) })
+}
+
+// WriteVia atomically and durably produces name with an external tool:
+// produce is given a temporary path in the same directory to write to (e.g.
+// as ffmpeg's output file). The path already exists (empty), so tools must be
+// told to overwrite it; it keeps name's extension. Whatever regular file is
+// at the path when produce returns is synced and renamed into place, so
+// produce may also replace it. If produce fails, the path is removed.
+func (d Dir) WriteVia(name string, produce func(tmpPath string) error) error {
+	return d.writeAtomic(name, func(f *os.File) error {
+		// Only a name reservation: the tool writes through its own handle.
+		if err := f.Close(); err != nil {
+			return err
+		}
+		return produce(f.Name())
+	})
+}
+
+// RemoveAll removes the directory and everything in it. A missing directory
+// is not an error. Removal isn't made durable (no directory sync): it's for
+// intermediates, which a crash may bring back.
+func (d Dir) RemoveAll() error {
+	return os.RemoveAll(d.path)
 }
 
 // ReadFile reads name.
@@ -97,9 +137,10 @@ func (d Dir) ReadJSON(name string, v any) error {
 	return nil
 }
 
-// writeAtomic creates a temp file next to name, lets fill write it, then
-// syncs, renames it into place and syncs the directory. It's the shared core
-// for every writer (Phase 3 will add one for files produced by ffmpeg).
+// writeAtomic creates a temp file next to name, lets fill write it (and
+// possibly close it), then syncs whatever regular file is at the temp path,
+// renames it into place and syncs the directory. It's the shared core for
+// every writer.
 func (d Dir) writeAtomic(name string, fill func(*os.File) error) error {
 	if err := checkName(name); err != nil {
 		return err
@@ -107,7 +148,9 @@ func (d Dir) writeAtomic(name string, fill func(*os.File) error) error {
 	if err := d.ensure(); err != nil {
 		return err
 	}
-	tmp, err := os.CreateTemp(d.path, "."+name+".tmp-*")
+	// The random part goes first so the temp file keeps name's extension
+	// (tools such as ffmpeg pick formats by extension).
+	tmp, err := os.CreateTemp(d.path, ".tmp-*-"+name)
 	if err != nil {
 		return err
 	}
@@ -115,16 +158,17 @@ func (d Dir) writeAtomic(name string, fill func(*os.File) error) error {
 	defer func() {
 		if !ok {
 			tmp.Close()
-			os.Remove(tmp.Name())
+			os.RemoveAll(tmp.Name()) // a tool may have left a directory
 		}
 	}()
 	if err := fill(tmp); err != nil {
 		return err
 	}
-	if err := tmp.Sync(); err != nil {
+	if err := tmp.Close(); err != nil && !errors.Is(err, os.ErrClosed) { // WriteVia closed it
 		return err
 	}
-	if err := tmp.Close(); err != nil {
+	// Sync through a fresh handle: fill may have replaced the file.
+	if err := syncFile(tmp.Name()); err != nil {
 		return err
 	}
 	if err := os.Rename(tmp.Name(), filepath.Join(d.path, name)); err != nil {
@@ -140,17 +184,21 @@ func (d Dir) ensure() error {
 	if _, err := os.Stat(d.path); err == nil {
 		return nil
 	}
-	articles := filepath.Dir(d.path)
-	_, statErr := os.Stat(articles)
-	articlesExisted := statErr == nil
+	// The deepest existing ancestor is the last directory to sync.
+	existing := filepath.Dir(d.path)
+	for {
+		if _, err := os.Stat(existing); err == nil || existing == filepath.Dir(existing) {
+			break
+		}
+		existing = filepath.Dir(existing)
+	}
 	if err := os.MkdirAll(d.path, 0o750); err != nil {
 		return err
 	}
-	if err := syncDir(articles); err != nil {
-		return err
-	}
-	if !articlesExisted {
-		return syncDir(filepath.Dir(articles))
+	for p := d.path; p != existing; p = filepath.Dir(p) {
+		if err := syncDir(filepath.Dir(p)); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -160,6 +208,23 @@ func checkName(name string) error {
 		return fmt.Errorf("%w: %q", ErrBadName, name)
 	}
 	return nil
+}
+
+// syncFile fsyncs the regular file at path.
+func syncFile(path string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return err
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("artifact: %s is not a regular file", filepath.Base(path))
+	}
+	return f.Sync()
 }
 
 // syncDir fsyncs a directory so entries created or renamed in it are durable.

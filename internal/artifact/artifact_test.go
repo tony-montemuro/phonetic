@@ -2,6 +2,7 @@ package artifact
 
 import (
 	"errors"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -11,7 +12,7 @@ import (
 
 func assertNoTempFiles(t *testing.T, d Dir) {
 	t.Helper()
-	matches, err := filepath.Glob(filepath.Join(d.path, ".*.tmp-*"))
+	matches, err := filepath.Glob(filepath.Join(d.path, ".tmp-*"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,4 +181,135 @@ func TestWriteCreatesNestedDirectories(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(root, "fresh-data-dir", "articles", "9", RawHTML)); err != nil {
 		t.Error(err)
 	}
+}
+
+func TestSubAndRemoveAll(t *testing.T) {
+	t.Parallel()
+	d := For(t.TempDir(), 3)
+	chunks := d.Sub(Chunks)
+	if err := chunks.WriteFile("0001.wav", []byte("a")); err != nil {
+		t.Fatal(err)
+	}
+	if got := chunks.Path("0001.wav"); got != filepath.Join(d.path, "chunks", "0001.wav") {
+		t.Errorf("Sub path = %q", got)
+	}
+	if err := chunks.RemoveAll(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(chunks.path); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("chunks dir still exists (%v)", err)
+	}
+	if err := chunks.RemoveAll(); err != nil {
+		t.Errorf("RemoveAll on a missing dir: %v", err)
+	}
+}
+
+// WriteVia hands an external producer a temp path, then renames it into
+// place; a failed producer leaves nothing behind.
+func TestWriteVia(t *testing.T) {
+	t.Parallel()
+	d := For(t.TempDir(), 4)
+	err := d.WriteVia(Audio, func(tmp string) error {
+		if filepath.Dir(tmp) != d.path || filepath.Base(tmp) == Audio || filepath.Ext(tmp) != ".mp3" {
+			t.Errorf("temp path %q should be a different .mp3 file in the same directory", tmp)
+		}
+		// Like ffmpeg: open the path itself (truncating) and write.
+		return os.WriteFile(tmp, []byte("mp3 data"), 0o644)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := d.ReadFile(Audio); err != nil || string(got) != "mp3 data" {
+		t.Errorf("Audio = %q, %v", got, err)
+	}
+
+	boom := errors.New("ffmpeg failed")
+	if err := d.WriteVia("other.mp3", func(tmp string) error {
+		_ = os.WriteFile(tmp, []byte("partial"), 0o644)
+		return boom
+	}); !errors.Is(err, boom) {
+		t.Errorf("err = %v, want the producer's error", err)
+	}
+	if _, err := d.ReadFile("other.mp3"); !errors.Is(err, fs.ErrNotExist) {
+		t.Error("failed producer's output was renamed into place")
+	}
+	assertNoTempFiles(t, d)
+}
+
+// A producer that writes elsewhere and renames over the temp path (as some
+// tools do) gets its file published; one that leaves no regular file fails.
+func TestWriteViaProducerVariants(t *testing.T) {
+	t.Parallel()
+	d := For(t.TempDir(), 6)
+	err := d.WriteVia("replaced.mp3", func(tmp string) error {
+		other := tmp + ".new"
+		if err := os.WriteFile(other, []byte("new data"), 0o644); err != nil {
+			return err
+		}
+		return os.Rename(other, tmp)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := d.ReadFile("replaced.mp3"); string(got) != "new data" {
+		t.Errorf("replaced content = %q", got)
+	}
+
+	for name, produce := range map[string]func(string) error{
+		"removed": os.Remove,
+		"directory": func(tmp string) error {
+			if err := os.Remove(tmp); err != nil {
+				return err
+			}
+			if err := os.Mkdir(tmp, 0o750); err != nil {
+				return err
+			}
+			return os.WriteFile(filepath.Join(tmp, "x"), nil, 0o644)
+		},
+	} {
+		if err := d.WriteVia(name+".mp3", produce); err == nil {
+			t.Errorf("%s: WriteVia succeeded", name)
+		}
+		if _, err := os.Lstat(d.Path(name + ".mp3")); !errors.Is(err, fs.ErrNotExist) {
+			t.Errorf("%s: something was published: %v", name, err)
+		}
+	}
+	assertNoTempFiles(t, d)
+}
+
+// Writing into a subdirectory of a fresh data dir creates every level.
+func TestSubOnFreshDataDir(t *testing.T) {
+	t.Parallel()
+	chunks := For(filepath.Join(t.TempDir(), "data"), 7).Sub(Chunks)
+	if err := chunks.WriteFile("0000.wav", []byte("x")); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := chunks.ReadFile("0000.wav"); string(got) != "x" {
+		t.Errorf("content = %q", got)
+	}
+}
+
+func TestWriteStream(t *testing.T) {
+	t.Parallel()
+	d := For(t.TempDir(), 5)
+	if err := d.WriteStream("a.wav", func(w io.Writer) error {
+		_, err := io.WriteString(w, "RIFF....")
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := d.ReadFile("a.wav"); string(got) != "RIFF...." {
+		t.Errorf("content = %q", got)
+	}
+	boom := errors.New("connection reset")
+	if err := d.WriteStream("b.wav", func(w io.Writer) error {
+		_, _ = io.WriteString(w, "partial")
+		return boom
+	}); !errors.Is(err, boom) {
+		t.Errorf("err = %v", err)
+	}
+	if _, err := d.ReadFile("b.wav"); !errors.Is(err, fs.ErrNotExist) {
+		t.Error("failed stream was renamed into place")
+	}
+	assertNoTempFiles(t, d)
 }
