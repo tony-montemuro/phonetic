@@ -50,6 +50,7 @@ type articleJSON struct {
 	ImageImportance *int         `json:"image_importance,omitzero"`
 	ImageNotes      string       `json:"image_notes,omitzero"`
 	DurationMS      int64        `json:"duration_ms,omitzero"`
+	AudioBytes      int64        `json:"audio_bytes,omitzero"`
 	CreatedAt       time.Time    `json:"created_at"`
 	UpdatedAt       time.Time    `json:"updated_at"`
 	ReadyAt         time.Time    `json:"ready_at,omitzero"`
@@ -62,6 +63,7 @@ func toArticleJSON(a store.Article) articleJSON {
 		PublishedAt: a.PublishedAt, WordCount: a.WordCount, ImageCount: a.ImageCount,
 		ImageImportance: a.ImageImportance, ImageNotes: a.ImageNotes,
 		DurationMS: a.Duration.Milliseconds(),
+		AudioBytes: a.AudioBytes,
 		CreatedAt:  a.CreatedAt, UpdatedAt: a.UpdatedAt, ReadyAt: a.ReadyAt,
 	}
 }
