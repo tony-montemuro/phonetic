@@ -392,6 +392,22 @@ func scanArticle(sc scanner) (Article, error) {
 	return a, nil
 }
 
+// nullString and nullMillis encode zero values as NULL; they mirror the
+// decoding in scanArticle.
+func nullString(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
+func nullMillis(t time.Time) any {
+	if t.IsZero() {
+		return nil
+	}
+	return t.UnixMilli()
+}
+
 // newLeaseID returns a random, non-zero lease token (zero means "not leased").
 func newLeaseID() int64 { return rand.Int64N(math.MaxInt64) + 1 }
 
