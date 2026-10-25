@@ -184,16 +184,15 @@ PHONETIC_PUBLIC_URL=https://pc.tailnet-name.ts.net    # base for enclosure URLs
 PHONETIC_API_TOKEN=...
 PHONETIC_FEED_USER=... / PHONETIC_FEED_PASSWORD=...
 PHONETIC_WORKERS=2                     # 1-16
-PHONETIC_DEV_STUB_DELAY=0s             # temporary: stub stages sleep this long
 PHONETIC_FETCH_BLOCKED=203.0.113.7     # extra networks never to fetch (e.g. the home WAN IP); always enforced
 PHONETIC_FETCH_ALLOW_PRIVATE=false     # DEV/TEST ONLY: disables SSRF protection; refused unless PHONETIC_ADDR is loopback
 PHONETIC_RETENTION_DAYS=30
 PHONETIC_LLM=anthropic | none
 ANTHROPIC_API_KEY=...
 PHONETIC_LLM_MODEL=<haiku 5.5 id>
-PHONETIC_TTS=openai-compatible | piper
-PHONETIC_TTS_URL=http://localhost:8880/v1
-PHONETIC_TTS_VOICE=...
+PHONETIC_TTS_URL=http://127.0.0.1:8880/v1   # any OpenAI-compatible speech API
+PHONETIC_TTS_MODEL=kokoro / PHONETIC_TTS_VOICE=af_heart / PHONETIC_TTS_SPEED=1
+PHONETIC_TTS_API_KEY=...               # hosted APIs only
 ```
 
 ## Development & deployment
@@ -264,9 +263,8 @@ Each phase ends with something that runs. The goal is to get end-to-end audio in
   - E2E helpers take `testing.TB` per call; the harness has `restart`, `kill` and `waitForLog` ready for recovery tests.
 
 - Phase 1 outcome / notes for later phases:
-  - Pipeline: `internal/pipeline` Runner with worker **pools** (`Options.Pools`; each stage in exactly one pool), lease heartbeats, claim-time attempt counting, `Permanent` errors, panic recovery, and per-pool wake-ups (`Notify`, stage hand-offs). Phase 3: give synthesizing its own 1-worker pool.
+  - Pipeline: `internal/pipeline` Runner with worker **pools** (`Options.Pools`; each stage in exactly one pool), lease heartbeats, claim-time attempt counting, `Permanent` errors, panic recovery, and per-pool wake-ups (`Notify`, stage hand-offs).
   - Stages get the claimed `store.Article`. Metadata they produce (title, word count, image importance...) must be written through **lease-guarded** store methods (CAS on `store.LeaseOf(a)`), not plain UPDATEs. Write stage files to a temp path and rename, so a superseded worker can't leave half-written outputs.
-  - `PHONETIC_DEV_STUB_DELAY` is a temporary aid (marked `TODO(phase-3)`); since Phase 2 the E2E crash tests use a slow fake site instead, so it only matters for `make run`. Remove it with the last stubs.
   - A data-dir `flock` enforces single-instance operation. `ReleaseAllLeases` at startup relies on it.
   - Resubmitting a URL whose article failed returns 200 with `status: failed` (no requeue). Phase 7's reprocess endpoint handles retries; the Shortcut can show the returned status.
   - Migrations are a small hand-rolled runner (`internal/store/migrate.go`). If the project gets serious, swap in `pressly/goose` or `golang-migrate`; only `store.Open` calls it.
@@ -284,12 +282,21 @@ Each phase ends with something that runs. The goal is to get end-to-end audio in
   - Fetcher SSRF guard: public addresses only, minus this machine's networks (public IPv6 widened to /56) and `PHONETIC_FETCH_BLOCKED`. Remaining gap: router hairpin to the WAN IPv4 — set `PHONETIC_FETCH_BLOCKED` to it in production.
   - E2E has a fake article site (`e2e/site_test.go`); instances run with `PHONETIC_FETCH_ALLOW_PRIVATE=true` (loopback only).
 
-### Phase 3: TTS and audio
+### Phase 3: TTS and audio ✅
 - Kokoro container on the Mac (CPU) via `make kokoro-up`; pick a voice. The GPU setup on Arch happens in Phase 4.
 - `tts.OpenAICompatible` adapter; chunking; ffmpeg concat; duration.
 - If CPU Kokoro is too slow for development: add the `tts.Say` adapter (macOS `say` → AIFF → ffmpeg) for dev only.
 - Use the `llm.None` passthrough so the extracted text goes straight to audio.
 - **Done when:** a posted URL becomes a listenable `audio.mp3`.
+
+- Phase 3 outcome / notes for later phases:
+  - CPU Kokoro (`kokoro-fastapi-cpu:v0.9.0`) runs at about 4x real time on the Mac, so no `say` adapter. Voice `af_heart`, speed 1.0 (open to change after listening). GPU compose file: `deploy/kokoro.compose.yml`.
+  - `stages.Script` is the passthrough (no `llm` package yet): an intro ("Title. By Author. From Site.") plus `SpokenText()`. Phase 6 replaces it; it should keep writing `script.txt`. Titles with a site suffix but no `site_name` (e.g. go.dev's " - The Go Programming Language") keep the suffix.
+  - `stages.Synthesize`: `audio.Chunk` (1500 bytes, paragraph → sentence → word) → one WAV per chunk in `chunks/` (cached by hash of fingerprint + text) → ffmpeg filter-graph concat with 0.35 s gaps, loudnorm to -16 LUFS, 64 kb/s mono MP3 at 24 kHz → `store.SaveAudio` (bytes, duration). Memory of the ffmpeg join grows with total audio length (~300 MB for 45 min).
+  - The engine's 400/413/422 fail the article permanently; Kokoro also answers an unknown voice with 400, so a voice typo fails articles at once (with Kokoro's message). Down engine = transient; with the default 3 attempts and 30 s backoff, an article fails if Kokoro is down for more than a couple of minutes. Phase 4/7: consider a longer backoff for synthesis, and the reprocess endpoint.
+  - The API exposes `duration_ms` and `audio_bytes`; Phase 4's feed needs both (`<enclosure length>`, `<itunes:duration>`).
+  - ffmpeg/ffprobe are checked at startup; the Arch box needs the `ffmpeg` package.
+  - E2E instances get a fake speech engine (`e2e/tts_test.go`) by default; they never reach a real Kokoro.
 
 ### Phase 4: Feed and delivery (MVP)
 - `/feed.xml` with iTunes tags and conditional GET; `/audio/{file}` (`<id>.mp3`); basic auth; channel artwork.
@@ -328,6 +335,6 @@ Each phase ends with something that runs. The goal is to get end-to-end audio in
 
 - Exact Haiku 5.5 model ID and structured-output shape (Phase 6).
 - Anthropic Go SDK vs. raw `net/http` (Phase 6). The SDK is the conventional choice; raw HTTP keeps dependencies minimal.
-- Kokoro voice and speed (Phase 3).
+- Kokoro voice and speed: `af_heart` at 1.0 for now; revisit after listening in the car.
 - Does Apple Podcasts refresh a Tailscale-only feed reliably (Phase 4)?
 - Retention window (default 30 days).
