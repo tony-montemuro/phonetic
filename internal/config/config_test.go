@@ -8,7 +8,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
 )
 
 const validToken = "0123456789abcdef"
@@ -38,11 +37,13 @@ func mustAbs(t *testing.T, p string) string {
 func TestLoadDefaults(t *testing.T) {
 	t.Parallel()
 	want := Config{Addr: DefaultAddr, DataDir: mustAbs(t, DefaultDataDir), LogLevel: slog.LevelInfo,
-		APIToken: validToken, Workers: DefaultWorkers}
+		APIToken: validToken, Workers: DefaultWorkers,
+		TTS: TTS{URL: "http://127.0.0.1:8880/v1", Model: "kokoro", Voice: "af_heart", Speed: 1}}
 	for name, e := range map[string]map[string]string{
 		"unset": nil,
 		"blank": {"PHONETIC_ADDR": "  ", "PHONETIC_DATA_DIR": "\t", "PHONETIC_LOG_LEVEL": " ",
-			"PHONETIC_WORKERS": " ", "PHONETIC_DEV_STUB_DELAY": " "},
+			"PHONETIC_WORKERS": " ", "PHONETIC_TTS_URL": " ",
+			"PHONETIC_TTS_MODEL": " ", "PHONETIC_TTS_VOICE": " ", "PHONETIC_TTS_SPEED": " ", "PHONETIC_TTS_API_KEY": " "},
 	} {
 		t.Run(name, func(t *testing.T) {
 			cfg, err := Load(env(e))
@@ -59,18 +60,23 @@ func TestLoadDefaults(t *testing.T) {
 func TestLoadOverrides(t *testing.T) {
 	t.Parallel()
 	cfg, err := Load(env(map[string]string{
-		"PHONETIC_ADDR":           " 100.64.0.1:9000 ",
-		"PHONETIC_DATA_DIR":       "/var/lib/phonetic",
-		"PHONETIC_LOG_LEVEL":      "debug",
-		"PHONETIC_API_TOKEN":      " a-much-longer-secret-token ",
-		"PHONETIC_WORKERS":        "4",
-		"PHONETIC_DEV_STUB_DELAY": "1500ms",
+		"PHONETIC_ADDR":        " 100.64.0.1:9000 ",
+		"PHONETIC_DATA_DIR":    "/var/lib/phonetic",
+		"PHONETIC_LOG_LEVEL":   "debug",
+		"PHONETIC_API_TOKEN":   " a-much-longer-secret-token ",
+		"PHONETIC_WORKERS":     "4",
+		"PHONETIC_TTS_URL":     "https://api.openai.com/v1",
+		"PHONETIC_TTS_MODEL":   "tts-1",
+		"PHONETIC_TTS_VOICE":   "alloy",
+		"PHONETIC_TTS_SPEED":   "1.25",
+		"PHONETIC_TTS_API_KEY": " sk-secret ",
 	}))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
 	want := Config{Addr: "100.64.0.1:9000", DataDir: "/var/lib/phonetic", LogLevel: slog.LevelDebug,
-		APIToken: "a-much-longer-secret-token", Workers: 4, StubDelay: 1500 * time.Millisecond}
+		APIToken: "a-much-longer-secret-token", Workers: 4,
+		TTS: TTS{URL: "https://api.openai.com/v1", Model: "tts-1", Voice: "alloy", Speed: 1.25, APIKey: "sk-secret"}}
 	if !reflect.DeepEqual(cfg, want) {
 		t.Errorf("got %+v, want %+v", cfg, want)
 	}
@@ -116,8 +122,6 @@ func TestLoadErrors(t *testing.T) {
 		{"workers zero", map[string]string{"PHONETIC_WORKERS": "0"}, []string{"PHONETIC_WORKERS"}},
 		{"workers too many", map[string]string{"PHONETIC_WORKERS": "17"}, []string{"PHONETIC_WORKERS"}},
 		{"workers not a number", map[string]string{"PHONETIC_WORKERS": "two"}, []string{"PHONETIC_WORKERS"}},
-		{"bad stub delay", map[string]string{"PHONETIC_DEV_STUB_DELAY": "soon"}, []string{"PHONETIC_DEV_STUB_DELAY"}},
-		{"negative stub delay", map[string]string{"PHONETIC_DEV_STUB_DELAY": "-1s"}, []string{"PHONETIC_DEV_STUB_DELAY"}},
 		{"bad allow-private", map[string]string{"PHONETIC_FETCH_ALLOW_PRIVATE": "sure"}, []string{"PHONETIC_FETCH_ALLOW_PRIVATE"}},
 		{"bad blocked prefix", map[string]string{"PHONETIC_FETCH_BLOCKED": "1.2.3.4/33"}, []string{"PHONETIC_FETCH_BLOCKED"}},
 		{"bad blocked address", map[string]string{"PHONETIC_FETCH_BLOCKED": "203.0.113.7, nope"}, []string{"PHONETIC_FETCH_BLOCKED"}},
@@ -126,6 +130,20 @@ func TestLoadErrors(t *testing.T) {
 		{"blocked /4", map[string]string{"PHONETIC_FETCH_BLOCKED": "16.0.0.0/4"}, []string{"too broad"}},
 		{"blocked zone", map[string]string{"PHONETIC_FETCH_BLOCKED": "fe80::1%eth0"}, []string{"zones"}},
 		{"blocked short mapped", map[string]string{"PHONETIC_FETCH_BLOCKED": "::ffff:0:0/80"}, []string{"IPv4-mapped"}},
+		{"tts url relative", map[string]string{"PHONETIC_TTS_URL": "localhost:8880/v1"}, []string{"PHONETIC_TTS_URL"}},
+		{"tts url ftp", map[string]string{"PHONETIC_TTS_URL": "ftp://host/v1"}, []string{"PHONETIC_TTS_URL"}},
+		{"tts url query", map[string]string{"PHONETIC_TTS_URL": "http://host/v1?x=1"}, []string{"PHONETIC_TTS_URL"}},
+		{"tts url bare query", map[string]string{"PHONETIC_TTS_URL": "http://host/v1?"}, []string{"PHONETIC_TTS_URL"}},
+		{"tts url bare fragment", map[string]string{"PHONETIC_TTS_URL": "http://host/v1#"}, []string{"PHONETIC_TTS_URL"}},
+		{"tts url no hostname", map[string]string{"PHONETIC_TTS_URL": "http://:8880/v1"}, []string{"PHONETIC_TTS_URL"}},
+		{"tts url bad port", map[string]string{"PHONETIC_TTS_URL": "http://host:99999/v1"}, []string{"PHONETIC_TTS_URL"}},
+		{"tts api key with space", map[string]string{"PHONETIC_TTS_API_KEY": "sk-ab cd"}, []string{"PHONETIC_TTS_API_KEY"}},
+		{"tts api key with control", map[string]string{"PHONETIC_TTS_API_KEY": "sk-ab\rcd"}, []string{"PHONETIC_TTS_API_KEY"}},
+		{"tts url credentials", map[string]string{"PHONETIC_TTS_URL": "http://u:p@host/v1"}, []string{"PHONETIC_TTS_URL"}},
+		{"tts speed too slow", map[string]string{"PHONETIC_TTS_SPEED": "0.1"}, []string{"PHONETIC_TTS_SPEED"}},
+		{"tts speed too fast", map[string]string{"PHONETIC_TTS_SPEED": "5"}, []string{"PHONETIC_TTS_SPEED"}},
+		{"tts speed NaN", map[string]string{"PHONETIC_TTS_SPEED": "NaN"}, []string{"PHONETIC_TTS_SPEED"}},
+		{"tts speed word", map[string]string{"PHONETIC_TTS_SPEED": "fast"}, []string{"PHONETIC_TTS_SPEED"}},
 		{"allow-private off loopback", map[string]string{"PHONETIC_ADDR": "100.64.0.1:8080", "PHONETIC_FETCH_ALLOW_PRIVATE": "true"}, []string{"loopback"}},
 		{
 			"all errors reported together",

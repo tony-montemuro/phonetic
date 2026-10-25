@@ -28,6 +28,8 @@ type article struct {
 	WordCount   int    `json:"word_count"`
 	ImageCount  int    `json:"image_count"`
 	ReadyAt     string `json:"ready_at"`
+	DurationMS  int64  `json:"duration_ms"`
+	AudioBytes  int64  `json:"audio_bytes"`
 }
 
 // api sends an authenticated JSON request and decodes the response into out
@@ -106,10 +108,24 @@ func TestSubmittedArticleBecomesReady(t *testing.T) {
 		t.Errorf("extracted metadata = %+v", got)
 	}
 	dir := filepath.Join(inst.DataDir, "articles", strconv.FormatInt(a.ID, 10))
-	for _, name := range []string{"raw.html", "fetch.json", "extracted.json"} {
+	for _, name := range []string{"raw.html", "fetch.json", "extracted.json", "script.txt", "audio.mp3"} {
 		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
 			t.Errorf("artifact %s: %v", name, err)
 		}
+	}
+	if _, err := os.Stat(filepath.Join(dir, "chunks")); !os.IsNotExist(err) {
+		t.Errorf("chunks dir left behind (%v)", err)
+	}
+	// The real script and synthesize stages ran against the fake engine.
+	script, _ := os.ReadFile(filepath.Join(dir, "script.txt"))
+	if !strings.HasPrefix(string(script), articleTitle("hello")+". By Test Author.") {
+		t.Errorf("script starts %q", script[:min(len(script), 60)])
+	}
+	if info, err := os.Stat(filepath.Join(dir, "audio.mp3")); err != nil || got.AudioBytes != info.Size() {
+		t.Errorf("audio_bytes = %d, file: %v %v", got.AudioBytes, info, err)
+	}
+	if want := len(inst.opts.TTS.Requests()) * int(chunkSpeech.Milliseconds()); got.DurationMS < int64(want) {
+		t.Errorf("duration_ms = %d, want at least %d (one chunk of speech per request)", got.DurationMS, want)
 	}
 
 	// Resubmitting (any spelling) returns the existing article.
@@ -143,6 +159,57 @@ func TestUnfetchablePagesFailPermanently(t *testing.T) {
 		if got.FailedStage != tt.stage || got.Attempts != 1 || !strings.Contains(got.Error, tt.wantErr) {
 			t.Errorf("%s: failed article = %+v, want a first-attempt %s failure mentioning %q", tt.path, got, tt.stage, tt.wantErr)
 		}
+	}
+}
+
+// Synthesis runs one article at a time (the engine has one GPU), even with
+// several workers.
+func TestSynthesisRunsOneAtATime(t *testing.T) {
+	t.Parallel()
+	web := newSite(t)
+	engine := newSpeechEngine(t)
+	engine.Delay.Store(int64(300 * time.Millisecond))
+	inst := start(t, options{TTS: engine, Env: map[string]string{"PHONETIC_WORKERS": "4"}})
+	var ids []int64
+	for i := range 4 {
+		ids = append(ids, submit(t, inst, web.URL(fmt.Sprintf("/article/concurrent-%d", i))).ID)
+	}
+	for _, id := range ids {
+		waitStatus(t, inst, id, "ready", 30*time.Second)
+	}
+	if n := len(engine.Requests()); n < len(ids) {
+		t.Errorf("engine got %d requests, want at least %d", n, len(ids))
+	}
+	if p := engine.Peak(); p != 1 {
+		t.Errorf("peak concurrent synthesis requests = %d, want 1", p)
+	}
+}
+
+// An engine that rejects the request fails the article at once; one that
+// is down leaves it to be retried.
+func TestSpeechEngineFailures(t *testing.T) {
+	t.Parallel()
+	web := newSite(t)
+
+	rejecting := newSpeechEngine(t)
+	rejecting.Fail.Store(http.StatusBadRequest)
+	inst := start(t, options{TTS: rejecting})
+	a := submit(t, inst, web.URL("/article/rejected"))
+	got := waitStatus(t, inst, a.ID, "failed", 10*time.Second)
+	if got.FailedStage != "synthesizing" || got.Attempts != 1 || !strings.Contains(got.Error, "400") {
+		t.Errorf("failed article = %+v, want a first-attempt synthesizing failure with the 400", got)
+	}
+
+	down := newSpeechEngine(t)
+	down.Fail.Store(http.StatusServiceUnavailable)
+	inst = start(t, options{TTS: down})
+	a = submit(t, inst, web.URL("/article/engine-down"))
+	if err := inst.waitForLog(t, "stage failed; will retry", 10*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	api(t, inst, "GET", fmt.Sprintf("/api/articles/%d", a.ID), "", &got)
+	if got.Status != "synthesizing" || !strings.Contains(got.Error, "503") {
+		t.Errorf("article = %+v, want still synthesizing with a 503 error", got)
 	}
 }
 

@@ -113,6 +113,19 @@ func TestInvalidConfigExitsWithError(t *testing.T) {
 	}
 }
 
+// Without ffmpeg, phonetic refuses to start rather than failing every
+// article later.
+func TestMissingFFmpegExitsWithError(t *testing.T) {
+	t.Parallel()
+	inst := launch(t, options{Env: map[string]string{"PATH": t.TempDir()}})
+	if st := inst.wait(t, exitTimeout); st != (exitStatus{Code: 1}) {
+		t.Fatalf("%s, want exit code 1", st)
+	}
+	if !strings.Contains(inst.Logs(), "install ffmpeg") {
+		t.Errorf("output does not explain that ffmpeg is missing")
+	}
+}
+
 func TestPortInUseExitsWithError(t *testing.T) {
 	t.Parallel()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")

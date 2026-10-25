@@ -41,6 +41,14 @@ func runMain(m *testing.M) int {
 	}
 	defer os.RemoveAll(dir)
 
+	// phonetic refuses to start without them.
+	for _, tool := range []string{"ffmpeg", "ffprobe"} {
+		if _, err := exec.LookPath(tool); err != nil {
+			fmt.Fprintf(os.Stderr, "e2e: %s not found (install ffmpeg): %v\n", tool, err)
+			return 1
+		}
+	}
+
 	binPath = filepath.Join(dir, "phonetic")
 	args := []string{"build", "-o", binPath}
 	if raceEnabled {
@@ -78,6 +86,7 @@ type options struct {
 	DataDir string            // default: fresh t.TempDir()
 	Addr    string            // default: a free localhost port
 	Env     map[string]string // extra/overriding variables
+	TTS     *speechEngine     // default: a fresh fake engine
 }
 
 // exitStatus describes how the process ended.
@@ -137,6 +146,9 @@ func launch(t testing.TB, opts options) *instance {
 	if opts.Addr == "" {
 		opts.Addr = freeAddr(t)
 	}
+	if opts.TTS == nil {
+		opts.TTS = newSpeechEngine(t)
+	}
 
 	env := map[string]string{
 		"PHONETIC_ADDR":      opts.Addr,
@@ -145,6 +157,8 @@ func launch(t testing.TB, opts options) *instance {
 		"PHONETIC_API_TOKEN": apiToken,
 		// The fake article site (site_test.go) runs on 127.0.0.1.
 		"PHONETIC_FETCH_ALLOW_PRIVATE": "true",
+		// Never a real engine that happens to run on the default port.
+		"PHONETIC_TTS_URL": opts.TTS.BaseURL(),
 	}
 	// Race-enabled binaries sleep atexit_sleep_ms (default 1s) on exit;
 	// shorten it unless the developer set GORACE themselves (even to empty),

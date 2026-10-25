@@ -8,8 +8,7 @@ import (
 )
 
 // StubStages returns placeholder implementations for every stage. Each waits
-// delay (honoring cancellation) and succeeds. Later phases replace them with
-// real stages one by one.
+// delay (honoring cancellation) and succeeds.
 func StubStages(delay time.Duration) map[store.Status]Stage {
 	stub := StageFunc(func(ctx context.Context, _ store.Article) error {
 		if err := ctx.Err(); err != nil {

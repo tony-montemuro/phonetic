@@ -10,19 +10,24 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/netip"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"runtime/debug"
+	"strings"
 	"syscall"
 	"time"
 
+	"github.com/tony-montemuro/phonetic/internal/audio"
 	"github.com/tony-montemuro/phonetic/internal/config"
 	"github.com/tony-montemuro/phonetic/internal/fetch"
 	"github.com/tony-montemuro/phonetic/internal/pipeline"
 	"github.com/tony-montemuro/phonetic/internal/server"
 	"github.com/tony-montemuro/phonetic/internal/stages"
 	"github.com/tony-montemuro/phonetic/internal/store"
+	"github.com/tony-montemuro/phonetic/internal/tts"
 )
 
 const (
@@ -84,7 +89,14 @@ func run() error {
 	defer stop()
 
 	logger.Info("starting phonetic", "version", version(), "addr", cfg.Addr, "data_dir", cfg.DataDir,
-		"workers", cfg.Workers, "fetch_allow_private", cfg.FetchAllowPrivate, "fetch_blocked", cfg.FetchBlocked)
+		"workers", cfg.Workers, "fetch_allow_private", cfg.FetchAllowPrivate, "fetch_blocked", cfg.FetchBlocked,
+		"tts_url", cfg.TTS.URL, "tts_model", cfg.TTS.Model, "tts_voice", cfg.TTS.Voice, "tts_speed", cfg.TTS.Speed)
+
+	// Fail now rather than on the first article.
+	tools := audio.Tools{}
+	if err := tools.Check(); err != nil {
+		return err
+	}
 
 	if err := os.MkdirAll(cfg.DataDir, 0o750); err != nil {
 		return fmt.Errorf("data dir: %w", err)
@@ -123,19 +135,33 @@ func run() error {
 		logger.Warn("released stale leases from a previous run", "count", n)
 	}
 
-	// TODO(phase-3): remove StubDelay with the last stub stages.
-	if cfg.StubDelay > 0 {
-		logger.Warn("stub stages sleep between steps (PHONETIC_DEV_STUB_DELAY)", "delay", cfg.StubDelay)
-	}
 	if cfg.FetchAllowPrivate {
 		logger.Warn("fetching private and local addresses is allowed (PHONETIC_FETCH_ALLOW_PRIVATE): SSRF protection is off")
 	}
+	if cfg.TTS.APIKey != "" && strings.HasPrefix(cfg.TTS.URL, "http://") && !isLoopbackURL(cfg.TTS.URL) {
+		logger.Warn("PHONETIC_TTS_API_KEY is sent unencrypted: PHONETIC_TTS_URL is plain http to another host")
+	}
 	fetcher := fetch.New(fetch.Options{AllowPrivate: cfg.FetchAllowPrivate, Blocked: cfg.FetchBlocked})
-	// Real stages replace the stubs as phases land.
-	impls := pipeline.StubStages(cfg.StubDelay)
-	impls[store.StatusFetching] = stages.Fetch{Fetcher: fetcher, DataDir: cfg.DataDir}
-	impls[store.StatusExtracting] = stages.Extract{Store: st, DataDir: cfg.DataDir}
-	runner, err := pipeline.New(st, impls, logger, pipeline.Options{Workers: cfg.Workers})
+	engine := tts.NewOpenAI(tts.OpenAI{
+		BaseURL: cfg.TTS.URL,
+		APIKey:  cfg.TTS.APIKey,
+		Model:   cfg.TTS.Model,
+		Voice:   cfg.TTS.Voice,
+		Speed:   cfg.TTS.Speed,
+	})
+	impls := map[store.Status]pipeline.Stage{
+		store.StatusFetching:     stages.Fetch{Fetcher: fetcher, DataDir: cfg.DataDir},
+		store.StatusExtracting:   stages.Extract{Store: st, DataDir: cfg.DataDir},
+		store.StatusScripting:    stages.Script{DataDir: cfg.DataDir},
+		store.StatusSynthesizing: stages.Synthesize{TTS: engine, Audio: tools, Store: st, DataDir: cfg.DataDir},
+	}
+	// Synthesis gets a single worker of its own: the engine (one GPU) runs
+	// one request at a time anyway, and a separate pool keeps a long
+	// synthesis from blocking fetches and extractions.
+	runner, err := pipeline.New(st, impls, logger, pipeline.Options{Pools: []pipeline.Pool{
+		{Workers: cfg.Workers, Stages: []store.Status{store.StatusFetching, store.StatusExtracting, store.StatusScripting}},
+		{Workers: 1, Stages: []store.Status{store.StatusSynthesizing}},
+	}})
 	if err != nil {
 		return err
 	}
@@ -221,6 +247,19 @@ func lockDataDir(dir string) (unlock func(), err error) {
 		syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
 		f.Close()
 	}, nil
+}
+
+// isLoopbackURL reports whether a URL's host is this machine.
+func isLoopbackURL(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return false
+	}
+	if u.Hostname() == "localhost" {
+		return true
+	}
+	a, err := netip.ParseAddr(u.Hostname())
+	return err == nil && a.Unmap().IsLoopback()
 }
 
 // shutdownHTTP drains in-flight requests, then force-closes stragglers.

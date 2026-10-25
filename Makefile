@@ -15,7 +15,7 @@ PHONETIC_LOG_LEVEL ?= debug
 PHONETIC_API_TOKEN ?= dev-token-not-secret-0000
 PHONETIC_WORKERS   ?= 2
 
-.PHONY: build build-linux run test test-short test-e2e test-all vet fmt fmt-check tidy-check clean
+.PHONY: build build-linux run kokoro-up kokoro-down test test-short test-e2e test-all vet fmt fmt-check tidy-check clean
 
 build:
 	$(GO) build -trimpath -o $(BIN_DIR)/$(BINARY) $(PKG)
@@ -24,17 +24,29 @@ build-linux:
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 $(GO) build -trimpath -o $(LINUX_BINARY) $(PKG)
 
 # @: don't echo the recipe, which contains the token.
-# TODO(phase-3): drop PHONETIC_DEV_STUB_DELAY with the stub stages.
 run: build
 	@PHONETIC_ADDR='$(PHONETIC_ADDR)' \
 	PHONETIC_DATA_DIR='$(PHONETIC_DATA_DIR)' \
 	PHONETIC_LOG_LEVEL='$(PHONETIC_LOG_LEVEL)' \
 	PHONETIC_API_TOKEN='$(PHONETIC_API_TOKEN)' \
 	PHONETIC_WORKERS='$(PHONETIC_WORKERS)' \
-	PHONETIC_DEV_STUB_DELAY='$(PHONETIC_DEV_STUB_DELAY)' \
 	PHONETIC_FETCH_ALLOW_PRIVATE='$(PHONETIC_FETCH_ALLOW_PRIVATE)' \
 	PHONETIC_FETCH_BLOCKED='$(PHONETIC_FETCH_BLOCKED)' \
+	PHONETIC_TTS_URL='$(PHONETIC_TTS_URL)' \
+	PHONETIC_TTS_MODEL='$(PHONETIC_TTS_MODEL)' \
+	PHONETIC_TTS_VOICE='$(PHONETIC_TTS_VOICE)' \
+	PHONETIC_TTS_SPEED='$(PHONETIC_TTS_SPEED)' \
+	PHONETIC_TTS_API_KEY='$(PHONETIC_TTS_API_KEY)' \
 	./$(BIN_DIR)/$(BINARY)
+
+# Local Kokoro TTS (CPU) for `make run`; see deploy/ for the GPU version.
+KOKORO_COMPOSE := docker compose -f deploy/kokoro.dev.compose.yml
+
+kokoro-up:
+	$(KOKORO_COMPOSE) up -d --wait
+
+kokoro-down:
+	$(KOKORO_COMPOSE) down
 
 test:
 	$(GO) test -race ./...

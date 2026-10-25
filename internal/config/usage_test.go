@@ -69,8 +69,16 @@ func TestUsageDefaultsMatchLoad(t *testing.T) {
 	if shown["PHONETIC_FETCH_ALLOW_PRIVATE"] != fmt.Sprint(cfg.FetchAllowPrivate) {
 		t.Errorf("allow-private default shown %q, actual %v", shown["PHONETIC_FETCH_ALLOW_PRIVATE"], cfg.FetchAllowPrivate)
 	}
-	if shown["PHONETIC_DEV_STUB_DELAY"] != cfg.StubDelay.String() {
-		t.Errorf("stub delay default shown %q, actual %s", shown["PHONETIC_DEV_STUB_DELAY"], cfg.StubDelay)
+	for name, actual := range map[string]string{
+		"PHONETIC_TTS_URL":     cfg.TTS.URL,
+		"PHONETIC_TTS_MODEL":   cfg.TTS.Model,
+		"PHONETIC_TTS_VOICE":   cfg.TTS.Voice,
+		"PHONETIC_TTS_SPEED":   fmt.Sprint(cfg.TTS.Speed),
+		"PHONETIC_TTS_API_KEY": cfg.TTS.APIKey,
+	} {
+		if shown[name] != actual {
+			t.Errorf("%s default shown %q, actual %q", name, shown[name], actual)
+		}
 	}
 	if cfg.FetchBlocked != nil || shown["PHONETIC_FETCH_BLOCKED"] != "" {
 		t.Errorf("blocked default shown %q, actual %v", shown["PHONETIC_FETCH_BLOCKED"], cfg.FetchBlocked)

@@ -8,10 +8,12 @@ import (
 	"log/slog"
 	"net"
 	"net/netip"
+	"net/url"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
+
+	"github.com/tony-montemuro/phonetic/internal/tts"
 )
 
 // Defaults suitable for local development.
@@ -40,10 +42,6 @@ type Config struct {
 	APIToken string
 	// Workers is the number of pipeline workers.
 	Workers int
-	// StubDelay makes the placeholder pipeline stages sleep this long each.
-	// Development/testing aid only.
-	// TODO(phase-3): remove with the stub stages.
-	StubDelay time.Duration
 	// FetchAllowPrivate lets the fetcher reach private and local addresses.
 	// For local development and tests only: it disables SSRF protection, so
 	// it is refused unless Addr is a loopback address.
@@ -51,6 +49,18 @@ type Config struct {
 	// FetchBlocked lists extra networks the fetcher must refuse, e.g. the
 	// home's WAN address, which some routers serve their admin page on.
 	FetchBlocked []netip.Prefix
+	// TTS configures the OpenAI-compatible speech API (Kokoro-FastAPI by
+	// default).
+	TTS TTS
+}
+
+// TTS configures the speech engine.
+type TTS struct {
+	URL    string // base URL, e.g. http://127.0.0.1:8880/v1
+	Model  string
+	Voice  string
+	Speed  float64
+	APIKey string // optional bearer token (hosted APIs); never logged
 }
 
 // Load builds a Config from the given environment lookup function (normally
@@ -62,6 +72,12 @@ func Load(getenv func(string) string) (Config, error) {
 		DataDir:  DefaultDataDir,
 		LogLevel: slog.LevelInfo,
 		Workers:  DefaultWorkers,
+		TTS: TTS{
+			URL:   tts.DefaultBaseURL,
+			Model: tts.DefaultModel,
+			Voice: tts.DefaultVoice,
+			Speed: tts.DefaultSpeed,
+		},
 	}
 	var errs []error
 
@@ -104,15 +120,6 @@ func Load(getenv func(string) string) (Config, error) {
 		}
 	}
 
-	if v := lookup(getenv, "PHONETIC_DEV_STUB_DELAY"); v != "" {
-		d, err := time.ParseDuration(v)
-		if err != nil || d < 0 {
-			errs = append(errs, fmt.Errorf("PHONETIC_DEV_STUB_DELAY %q: must be a non-negative duration like 2s", v))
-		} else {
-			cfg.StubDelay = d
-		}
-	}
-
 	if v := lookup(getenv, "PHONETIC_FETCH_ALLOW_PRIVATE"); v != "" {
 		b, err := strconv.ParseBool(v)
 		if err != nil {
@@ -137,6 +144,32 @@ func Load(getenv func(string) string) (Config, error) {
 			}
 			cfg.FetchBlocked = append(cfg.FetchBlocked, p)
 		}
+	}
+
+	if v := lookup(getenv, "PHONETIC_TTS_URL"); v != "" {
+		cfg.TTS.URL = v
+	}
+	if err := validateHTTPURL(cfg.TTS.URL); err != nil {
+		errs = append(errs, fmt.Errorf("PHONETIC_TTS_URL %q: %w", cfg.TTS.URL, err))
+	}
+	if v := lookup(getenv, "PHONETIC_TTS_MODEL"); v != "" {
+		cfg.TTS.Model = v
+	}
+	if v := lookup(getenv, "PHONETIC_TTS_VOICE"); v != "" {
+		cfg.TTS.Voice = v
+	}
+	if v := lookup(getenv, "PHONETIC_TTS_SPEED"); v != "" {
+		f, err := strconv.ParseFloat(v, 64)
+		if err != nil || !(f >= tts.MinSpeed && f <= tts.MaxSpeed) {
+			errs = append(errs, fmt.Errorf("PHONETIC_TTS_SPEED %q: must be a number from %g to %g", v, tts.MinSpeed, tts.MaxSpeed))
+		} else {
+			cfg.TTS.Speed = f
+		}
+	}
+	cfg.TTS.APIKey = lookup(getenv, "PHONETIC_TTS_API_KEY")
+	if strings.ContainsFunc(cfg.TTS.APIKey, func(r rune) bool { return r <= ' ' || r > '~' }) {
+		// Never echo the key itself.
+		errs = append(errs, errors.New("PHONETIC_TTS_API_KEY: must be printable ASCII without spaces"))
 	}
 
 	if err := errors.Join(errs...); err != nil {
@@ -199,6 +232,28 @@ func isLoopbackAddr(addr string) bool {
 
 func lookup(getenv func(string) string, key string) string {
 	return strings.TrimSpace(getenv(key))
+}
+
+// validateHTTPURL requires an absolute http(s) URL with a host, a valid
+// port if any, and no credentials, query or fragment (paths are appended to
+// it).
+func validateHTTPURL(raw string) error {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return err
+	}
+	if (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" {
+		return errors.New("must be an absolute http(s) URL with a host")
+	}
+	if p := u.Port(); p != "" {
+		if n, err := strconv.ParseUint(p, 10, 16); err != nil || n == 0 {
+			return fmt.Errorf("port must be a number in 1-65535, got %q", p)
+		}
+	}
+	if u.User != nil || strings.ContainsAny(raw, "?#") {
+		return errors.New("must not contain credentials, a query or a fragment")
+	}
+	return nil
 }
 
 // validateAddr requires host:port with an explicit, non-zero numeric port, so

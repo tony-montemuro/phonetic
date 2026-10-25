@@ -68,6 +68,9 @@ const (
 	DefaultVoice    = "af_heart"
 	DefaultSpeed    = 1.0
 	DefaultMaxBytes = 1500
+	// The speech API's speed range (OpenAI's; Kokoro-FastAPI accepts the same).
+	MinSpeed = 0.25
+	MaxSpeed = 4.0
 	// maxAudioBytes bounds one chunk's response (WAV at 24 kHz is about
 	// 48 KB per second, so this is minutes of speech).
 	maxAudioBytes = 64 << 20
@@ -88,7 +91,7 @@ type OpenAI struct {
 	APIKey   string  // sent as a bearer token if set (OpenAI); Kokoro needs none
 	Model    string  // e.g. "kokoro", "tts-1"
 	Voice    string  // e.g. "af_heart", "alloy"
-	Speed    float64 // 0.25-4.0
+	Speed    float64 // MinSpeed-MaxSpeed
 	MaxBytes int     // per request; OpenAI's limit is 4096 characters
 	Client   *http.Client
 }

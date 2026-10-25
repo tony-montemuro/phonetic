@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"text/tabwriter"
+
+	"github.com/tony-montemuro/phonetic/internal/tts"
 )
 
 // Var documents one environment variable. Vars is the single list of every
@@ -24,7 +26,11 @@ var Vars = []Var{
 	{"PHONETIC_WORKERS", fmt.Sprint(DefaultWorkers), fmt.Sprintf("pipeline workers (1-%d)", MaxWorkers)},
 	{"PHONETIC_FETCH_BLOCKED", "", "comma-separated addresses or CIDRs the fetcher must never connect to, e.g. your WAN IP (IPv4 /8 or longer, IPv6 /16 or longer)"},
 	{"PHONETIC_FETCH_ALLOW_PRIVATE", "false", "DEV/TEST ONLY: allow fetching private and local addresses (disables SSRF protection; requires a loopback PHONETIC_ADDR)"},
-	{"PHONETIC_DEV_STUB_DELAY", "0s", "DEV ONLY: make the placeholder pipeline stages sleep this long"},
+	{"PHONETIC_TTS_URL", tts.DefaultBaseURL, "OpenAI-compatible speech API base URL (Kokoro-FastAPI, or https://api.openai.com/v1)"},
+	{"PHONETIC_TTS_MODEL", tts.DefaultModel, "speech model"},
+	{"PHONETIC_TTS_VOICE", tts.DefaultVoice, "voice (Kokoro lists them at <url>/audio/voices)"},
+	{"PHONETIC_TTS_SPEED", fmt.Sprint(tts.DefaultSpeed), fmt.Sprintf("speaking speed (%g-%g)", tts.MinSpeed, tts.MaxSpeed)},
+	{"PHONETIC_TTS_API_KEY", "", "bearer token for a hosted speech API; Kokoro needs none"},
 }
 
 // WriteUsage writes a table of Vars to w.
