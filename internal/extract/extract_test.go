@@ -635,3 +635,19 @@ func TestExtractPermalinkMustBeSamePageAnchor(t *testing.T) {
 		t.Errorf("a real section-sign link was dropped: %q", texts(a)[0])
 	}
 }
+
+// React streaming SSR (e.g. LessWrong): the article arrives in hidden
+// <div id="S:n"> chunks, moved into <template id="B:n"> placeholders by
+// script. Chunks can nest.
+func TestExtractResolvesReactStreamedContent(t *testing.T) {
+	t.Parallel()
+	page := `<!doctype html><html><head><title>Streamed Post</title></head><body>
+		<div id="root"><template id="B:0"></template></div>
+		<div hidden id="S:0"><main><h1>Streamed Post</h1><template id="P:1"></template></main></div>
+		<div hidden id="S:1"><article><p>` + filler + `</p><p>Second paragraph. ` + filler + `</p></article></div>
+		<script>$RC("B:0","S:0");$RS("S:1","P:1")</script></body></html>`
+	a := mustExtract(t, page)
+	if len(a.Blocks) < 2 || !strings.HasPrefix(a.Blocks[len(a.Blocks)-1].Text, "Second paragraph.") {
+		t.Errorf("streamed content not resolved: %q", texts(a))
+	}
+}

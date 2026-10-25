@@ -219,6 +219,8 @@ var (
 )
 
 // prepare adjusts the parsed page before readability sees it:
+//   - puts React streaming content where it belongs (see
+//     resolveStreamedContent), since readability skips hidden elements;
 //   - removes known site chrome (see mediaWikiChrome, codeExampleChrome);
 //   - marks code <pre>s (see isCodePre) with classCode, so code without a
 //     <code> child isn't read aloud as prose;
@@ -227,6 +229,7 @@ var (
 //     whose class looks unlikely (e.g. "comment"), which would remove code
 //     comments.
 func prepare(root *html.Node) {
+	resolveStreamedContent(root)
 	mediaWiki := false
 	if body := find(root, atom.Body); body != nil {
 		mediaWiki = hasClass(body, "mediawiki")
@@ -256,6 +259,73 @@ func prepare(root *html.Node) {
 	for _, n := range remove {
 		n.Parent.RemoveChild(n)
 	}
+}
+
+// resolveStreamedContent does what React's streaming server rendering does
+// in the browser: content arrives later in the page as <div hidden
+// id="S:n">, and a script moves it into its placeholder, <template
+// id="B:n"> (a Suspense boundary, $RC) or <template id="P:n"> (a segment,
+// $RS). Without this, readability (which skips hidden elements) sees only
+// placeholders. Streamed chunks can contain further placeholders, so it
+// repeats until nothing more resolves.
+func resolveStreamedContent(root *html.Node) {
+	for {
+		templates := map[string]*html.Node{}
+		chunks := map[string]*html.Node{}
+		var rec func(*html.Node)
+		rec = func(n *html.Node) {
+			if n.Type == html.ElementNode {
+				id := attr(n, "id")
+				switch tag := atom.Lookup([]byte(n.Data)); {
+				case tag == atom.Template && (strings.HasPrefix(id, "B:") || strings.HasPrefix(id, "P:")):
+					templates[id[2:]] = n
+				case tag == atom.Div && strings.HasPrefix(id, "S:") && hasAttr(n, "hidden"):
+					chunks[strings.TrimPrefix(id, "S:")] = n
+				}
+			}
+			for c := n.FirstChild; c != nil; c = c.NextSibling {
+				rec(c)
+			}
+		}
+		rec(root)
+		moved := false
+		for key, tmpl := range templates {
+			chunk, ok := chunks[key]
+			if !ok || tmpl.Parent == nil || isAncestor(chunk, tmpl) {
+				continue
+			}
+			for chunk.FirstChild != nil {
+				c := chunk.FirstChild
+				chunk.RemoveChild(c)
+				tmpl.Parent.InsertBefore(c, tmpl)
+			}
+			tmpl.Parent.RemoveChild(tmpl)
+			chunk.Parent.RemoveChild(chunk)
+			moved = true
+		}
+		if !moved {
+			return
+		}
+	}
+}
+
+// isAncestor reports whether a is an ancestor of n.
+func isAncestor(a, n *html.Node) bool {
+	for p := n.Parent; p != nil; p = p.Parent {
+		if p == a {
+			return true
+		}
+	}
+	return false
+}
+
+func hasAttr(n *html.Node, key string) bool {
+	for _, a := range n.Attr {
+		if a.Namespace == "" && a.Key == key {
+			return true
+		}
+	}
+	return false
 }
 
 func isMediaWikiChrome(n *html.Node) bool {
