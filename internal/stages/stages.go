@@ -92,11 +92,11 @@ func (s Extract) Run(ctx context.Context, a store.Article) error {
 	dir := artifact.For(s.DataDir, a.ID)
 	var meta FetchMeta
 	if err := dir.ReadJSON(artifact.FetchMeta, &meta); err != nil {
-		return inputErr(err)
+		return inputErr(err, "fetch output", "re-fetched")
 	}
 	page, err := dir.ReadFile(artifact.RawHTML)
 	if err != nil {
-		return inputErr(err)
+		return inputErr(err, "fetch output", "re-fetched")
 	}
 	pageURL, err := parseHTTPURL(meta.URL)
 	if err != nil {
@@ -145,17 +145,18 @@ func parseHTTPURL(raw string) (*url.URL, error) {
 	return u, nil
 }
 
-// inputErr classifies a failure to read the fetch stage's output. A missing
-// or corrupt file won't be fixed by retrying extract (the article must be
-// re-fetched), so those are permanent; other read errors may be transient.
-func inputErr(err error) error {
+// inputErr classifies a failure to read a previous stage's output (what). A
+// missing or corrupt file won't be fixed by retrying this stage (the article
+// must be re-run from the stage that makes it: fix), so those are permanent;
+// other read errors may be transient.
+func inputErr(err error, what, fix string) error {
 	var syntaxErr *jsontext.SyntacticError
 	var semanticErr *json.SemanticError
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
-		return pipeline.Permanent(fmt.Errorf("fetch output missing; the article must be re-fetched: %w", err))
+		return pipeline.Permanent(fmt.Errorf("%s missing; the article must be %s: %w", what, fix, err))
 	case errors.As(err, &syntaxErr) || errors.As(err, &semanticErr):
-		return pipeline.Permanent(fmt.Errorf("fetch output corrupt; the article must be re-fetched: %w", err))
+		return pipeline.Permanent(fmt.Errorf("%s corrupt; the article must be %s: %w", what, fix, err))
 	}
-	return fmt.Errorf("reading fetch output: %w", err)
+	return fmt.Errorf("reading %s: %w", what, err)
 }
