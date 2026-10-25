@@ -34,3 +34,16 @@ func (s *Store) SaveExtracted(ctx context.Context, l Lease, m ExtractedMetadata,
 		nullString(m.Title), nullString(m.Author), nullString(m.SiteName), nullMillis(m.PublishedAt),
 		m.WordCount, m.ImageCount, now.UnixMilli())
 }
+
+// SaveAudio records the episode's size and length for an article leased at
+// the synthesizing stage (lease-guarded, like every stage write).
+func (s *Store) SaveAudio(ctx context.Context, l Lease, bytes int64, duration time.Duration, now time.Time) error {
+	if l.Stage != StatusSynthesizing {
+		return fmt.Errorf("SaveAudio: lease is for stage %q, not %q", l.Stage, StatusSynthesizing)
+	}
+	if bytes <= 0 || duration.Milliseconds() <= 0 {
+		return fmt.Errorf("SaveAudio: implausible audio (%d bytes, %s)", bytes, duration)
+	}
+	return s.leaseWrite(ctx, l, `audio_bytes = ?, duration_ms = ?, updated_at = ?`,
+		bytes, duration.Milliseconds(), now.UnixMilli())
+}

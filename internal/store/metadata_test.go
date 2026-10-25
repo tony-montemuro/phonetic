@@ -118,3 +118,48 @@ func TestSaveExtractedRejectsNegativeCounts(t *testing.T) {
 		t.Error("negative word count accepted")
 	}
 }
+
+func TestSaveAudio(t *testing.T) {
+	t.Parallel()
+	s := openStore(t)
+	ctx := context.Background()
+	a := claimAt(t, s, "https://example.com/audio", StatusSynthesizing)
+	if err := s.SaveAudio(ctx, LeaseOf(a), 123456, 95*time.Second+500*time.Millisecond, t0); err != nil {
+		t.Fatal(err)
+	}
+	got := mustGet(t, s, a.ID)
+	if got.AudioBytes != 123456 || got.Duration != 95500*time.Millisecond {
+		t.Errorf("audio = %d bytes, %s", got.AudioBytes, got.Duration)
+	}
+	if _, err := s.CompleteStage(ctx, LeaseOf(a), t0); err != nil {
+		t.Errorf("CompleteStage after SaveAudio: %v", err)
+	}
+	if got := mustGet(t, s, a.ID); got.Status != StatusReady || got.AudioBytes != 123456 {
+		t.Errorf("after completing: %+v", got)
+	}
+}
+
+func TestSaveAudioValidation(t *testing.T) {
+	t.Parallel()
+	s := openStore(t)
+	ctx := context.Background()
+	a := claimAt(t, s, "https://example.com/audio", StatusSynthesizing)
+	for _, tc := range []struct {
+		bytes int64
+		d     time.Duration
+	}{{0, time.Second}, {10, 0}, {-1, time.Second}, {10, time.Microsecond}} {
+		if err := s.SaveAudio(ctx, LeaseOf(a), tc.bytes, tc.d, t0); err == nil {
+			t.Errorf("SaveAudio(%d, %s) accepted", tc.bytes, tc.d)
+		}
+	}
+	wrong := LeaseOf(a)
+	wrong.Stage = StatusExtracting
+	if err := s.SaveAudio(ctx, wrong, 10, time.Second, t0); err == nil {
+		t.Error("SaveAudio accepted a lease for another stage")
+	}
+	stale := LeaseOf(a)
+	stale.Token++
+	if err := s.SaveAudio(ctx, stale, 10, time.Second, t0); !errors.Is(err, ErrLeaseLost) {
+		t.Errorf("stale lease: err = %v, want ErrLeaseLost", err)
+	}
+}
