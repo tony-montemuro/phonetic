@@ -565,3 +565,17 @@ func TestFetchHonorsSevenBitMetaCharset(t *testing.T) {
 		t.Errorf("ISO-2022-JP not decoded: %q", res.Body)
 	}
 }
+
+// Blocked prefixes apply even when the built-in rules are off.
+func TestFetchBlockedAppliesWithAllowPrivate(t *testing.T) {
+	t.Parallel()
+	srv := serve(t, htmlHandler("text/html", page))
+	f := New(Options{AllowPrivate: true, Blocked: []netip.Prefix{netip.MustParsePrefix("127.0.0.1/32")}})
+	_, err := f.Fetch(context.Background(), srv.URL)
+	if !errors.Is(err, ErrBlockedAddress) || !strings.Contains(err.Error(), "configured block") {
+		t.Errorf("err = %v, want a configured-block error", err)
+	}
+	if _, err := New(Options{AllowPrivate: true}).Fetch(context.Background(), srv.URL); err != nil {
+		t.Errorf("allow-private without blocks refused: %v", err)
+	}
+}

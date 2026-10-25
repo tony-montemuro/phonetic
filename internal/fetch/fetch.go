@@ -106,9 +106,10 @@ type Options struct {
 	MaxRedirects int           // default 10
 	UserAgent    string        // default: a browser-like UA naming phonetic
 	// Blocked adds prefixes to refuse on top of the built-in rules (e.g.
-	// the home's WAN address or delegated IPv6 prefix).
+	// the home's WAN address or delegated IPv6 prefix). Always enforced.
 	Blocked []netip.Prefix
-	// AllowPrivate disables the address checks entirely. For tests and
+	// AllowPrivate disables the built-in address rules (non-public ranges
+	// and this machine's networks); Blocked still applies. For tests and
 	// local development only.
 	AllowPrivate bool
 }
@@ -154,8 +155,11 @@ type Fetcher struct {
 func New(opts Options) *Fetcher {
 	opts = opts.withDefaults()
 	var allow func(netip.Addr) error
-	if !opts.AllowPrivate {
+	switch {
+	case !opts.AllowPrivate:
 		allow = defaultAllow(opts.Blocked, net.InterfaceAddrs)
+	case len(opts.Blocked) > 0:
+		allow = blockedOnly(opts.Blocked)
 	}
 	return newFetcher(opts, allow)
 }
@@ -337,6 +341,20 @@ func isPublic(addr netip.Addr) bool {
 		}
 	}
 	return true
+}
+
+// blockedOnly refuses only the configured prefixes (used when the built-in
+// rules are off).
+func blockedOnly(blocked []netip.Prefix) func(netip.Addr) error {
+	return func(addr netip.Addr) error {
+		addr = addr.Unmap()
+		for _, p := range blocked {
+			if p.Contains(addr) {
+				return fmt.Errorf("%w: %s (configured block)", ErrBlockedAddress, addr)
+			}
+		}
+		return nil
+	}
 }
 
 // lanV6Bits is the widest IPv6 prefix treated as "ours" around each public
