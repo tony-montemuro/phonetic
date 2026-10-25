@@ -254,6 +254,10 @@ func (w *walker) walk(n *html.Node) {
 		if w.isFootnoteMarker(n) {
 			return
 		}
+	case atom.A:
+		if isPermalink(n) {
+			return
+		}
 	case atom.Pre:
 		w.pre(n)
 		return
@@ -512,6 +516,14 @@ func (w *walker) isFootnoteMarker(n *html.Node) bool {
 }
 
 func isBracketOrSpace(r rune) bool { return isSpace(r) || r == '[' || r == ']' }
+
+// permalinkSymbols are the whole text of heading anchor links ("Section¶").
+var permalinkSymbols = map[string]bool{"\u00b6": true, "#": true, "\u00a7": true, "\U0001F517": true}
+
+// isPermalink reports a link whose only text is a permalink symbol.
+func isPermalink(a *html.Node) bool {
+	return permalinkSymbols[strings.TrimFunc(textOf(a), isSpace)]
+}
 
 // isLayoutTable guesses whether a table is page layout rather than data,
 // following the signals readability itself uses: a nested table or a long

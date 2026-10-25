@@ -514,3 +514,11 @@ func TestExtractSkipsTitleBannerImage(t *testing.T) {
 		t.Errorf("images = %+v (title banner should be skipped)", a.Images)
 	}
 }
+
+func TestExtractDropsPermalinkAnchors(t *testing.T) {
+	t.Parallel()
+	a := mustExtract(t, doc("", `<p>`+filler+`</p><h2>Basic Tutorial<a class="headerlink" href="#basic">`+"\u00b6"+`</a></h2><h3>Next <a href="#n">#</a></h3><p>`+filler+`</p>`))
+	if !hasBlock(a, KindHeading, "Basic Tutorial") || !hasBlock(a, KindHeading, "Next") {
+		t.Errorf("permalink symbols kept: %q", texts(a))
+	}
+}
