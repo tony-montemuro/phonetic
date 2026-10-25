@@ -551,21 +551,80 @@ not code.</pre><p>`+filler+`</p>`))
 
 func TestExtractRemovesKnownChrome(t *testing.T) {
 	t.Parallel()
-	a := mustExtract(t, doc("", `<div class="shortdescription">Hidden short description</div>
+	page := `<html><head><title>A Test Post</title></head><body class="mediawiki skin-vector"><main>
+		<div class="shortdescription">Hidden short description</div>
 		<div id="contentSub"><span class="mw-redirectedfrom">(Redirected from X)</span></div>
-		<p>`+filler+`</p>
+		<p>` + filler + `</p>
 		<div class="mw-heading mw-heading2"><h2 id="History">History</h2><span class="mw-editsection">[<a href="/edit">edit</a>]</span></div>
-		<p>`+filler+`</p>
-		<div class="example-header"><span class="language-name">http</span></div><pre><code>GET / HTTP/1.1</code></pre>
-		<div class="reflist"><ol class="references"><li>Dunham, 1999, p. xxiv.</li></ol></div>`))
+		<p>` + filler + `</p>
+		<div class="reflist"><ol class="references"><li>Dunham, 1999, p. xxiv.</li></ol></div></main></body></html>`
+	a := mustExtract(t, page)
 	spoken := a.SpokenText()
-	for _, junk := range []string{"Hidden short description", "Redirected from", "edit", "Dunham", "\n\nhttp\n\n"} {
+	for _, junk := range []string{"Hidden short description", "Redirected from", "edit", "Dunham"} {
 		if strings.Contains(spoken, junk) {
 			t.Errorf("chrome %q read aloud: %q", junk, spoken)
 		}
 	}
 	if !hasBlock(a, KindHeading, "History") {
 		t.Errorf("Wikipedia heading lost: %q", texts(a))
+	}
+
+	mdn := mustExtract(t, doc("", `<p>`+filler+`</p><div class="code-example"><div class="example-header"><span class="language-name">http</span></div><pre class="brush: http notranslate">GET / HTTP/1.1</pre></div><p>`+filler+`</p>`))
+	if strings.Contains(mdn.SpokenText(), "\n\nhttp\n\n") || !hasBlock(mdn, KindCode, "GET / HTTP/1.1") {
+		t.Errorf("MDN code example: %q", mdn.Blocks)
+	}
+}
+
+// The MediaWiki and MDN class lists apply only on those sites: elsewhere a
+// "tagline" subtitle or a "references" wrapper is real content.
+func TestExtractChromeClassesAreScoped(t *testing.T) {
+	t.Parallel()
+	a := mustExtract(t, doc("", `<p class="tagline">Why the budget fight matters for every resident of the city.</p><p>`+filler+`</p>
+		<div class="references"><p>Smith argues the point at length in his book. `+filler+`</p></div><p>`+filler+`</p>`))
+	spoken := a.SpokenText()
+	for _, want := range []string{"Why the budget fight matters", "Smith argues"} {
+		if !strings.Contains(spoken, want) {
+			t.Errorf("non-Wikipedia/MDN content %q removed: %q", want, texts(a))
+		}
+	}
+}
+
+func TestExtractCodeDetectionIsScoped(t *testing.T) {
+	t.Parallel()
+	verse := "<pre>Roses are red,\nviolets are blue.</pre>"
+	for name, page := range map[string]string{
+		"lang class on body": `<html><head><title>T</title></head><body class="lang-en"><article><p>` + filler + `</p>` + verse + `<p>` + filler + `</p></article></body></html>`,
+		"language wrapper":   doc("", `<div class="page language-fr"><p>`+filler+`</p>`+verse+`<p>`+filler+`</p></div>`),
+		"highlights box":     doc("", `<p>`+filler+`</p><div class="post-highlights">`+verse+`</div><p>`+filler+`</p>`),
+	} {
+		a := mustExtract(t, page)
+		if !hasBlock(a, KindPreformatted, "Roses are red,\nviolets are blue.") {
+			t.Errorf("%s: verse misclassified: %q", name, a.Blocks)
+		}
+	}
+	a := mustExtract(t, doc("", `<p>`+filler+`</p><pre class="hljs">a := 1</pre><div class="codehilite"><pre>b = 2</pre></div>
+		<div class="wp-block-code"><pre>c = 3</pre></div><pre><code class="language-go">d := 4</code></pre><p>`+filler+`</p>`))
+	for _, code := range []string{"a := 1", "b = 2", "c = 3", "d := 4"} {
+		if !hasBlock(a, KindCode, code) {
+			t.Errorf("%q not detected as code: %q", code, a.Blocks)
+		}
+	}
+}
+
+// Classes the walker needs survive the highlighting strip inside <pre>.
+func TestExtractEmojiInPre(t *testing.T) {
+	t.Parallel()
+	a := mustExtract(t, doc("", `<p>`+filler+`</p><pre>I am happy <img class="emoji" src="/e.png" alt="X"> today</pre><p>`+filler+`</p>`))
+	if !hasBlock(a, KindPreformatted, "I am happy X today") || len(a.Images) != 0 {
+		t.Errorf("emoji in <pre>: blocks %q, images %+v", a.Blocks, a.Images)
+	}
+}
+
+func TestExtractAbsoluteSamePagePermalink(t *testing.T) {
+	t.Parallel()
+	a := mustExtract(t, doc("", `<p>`+filler+`</p><h2>Intro <a href="https://example.com/posts/1#intro">#</a></h2><p>`+filler+`</p>`))
+	if !hasBlock(a, KindHeading, "Intro") {
+		t.Errorf("absolute same-page permalink kept: %q", texts(a))
 	}
 }
 
