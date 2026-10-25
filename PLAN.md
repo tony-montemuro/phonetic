@@ -239,30 +239,7 @@ Three layers. Each phase adds to all three where it makes sense.
 
 ## Project layout
 
-```
-phonetic/
-  cmd/phonetic/main.go        # config, wiring, start server + workers
-  cmd/phonetic-extract/       # try extraction on a URL; capture fixtures
-  internal/
-    config/                   # env/flag parsing
-    store/                    # SQLite access, migrations (embedded SQL)
-    pipeline/                 # worker loop, state machine, stages
-    fetch/                    # Fetcher + HTTP implementation
-    extract/                  # readability wrapper
-    llm/                      # LLM interface, anthropic, none
-    tts/                      # TTS interface, openai-compatible, piper
-    audio/                    # chunking, ffmpeg concat/duration
-    feed/                     # RSS types (encoding/xml) + builder
-    server/                   # handlers, auth middleware
-  deploy/
-    phonetic.service          # systemd unit
-    kokoro.compose.yml        # Kokoro TTS container (GPU, prod)
-    kokoro.dev.compose.yml    # Kokoro TTS container (CPU, macOS dev)
-  internal/testutil/          # shared fakes (article site, TTS, LLM) + helpers
-  e2e/                        # end-to-end tests (build tag: e2e)
-  Makefile
-  PLAN.md
-```
+See `ARCHITECTURE.md` for the current package map. New packages planned for later phases: `tts`, `audio`, `llm`, `feed`, and `deploy/` (systemd unit, Kokoro compose files).
 
 ## Phases
 
