@@ -522,3 +522,57 @@ func TestExtractDropsPermalinkAnchors(t *testing.T) {
 		t.Errorf("permalink symbols kept: %q", texts(a))
 	}
 }
+
+// readability deletes elements whose class looks like page clutter, such as
+// "comment"; syntax-highlighted code comments must survive.
+func TestExtractKeepsHighlightedCodeComments(t *testing.T) {
+	t.Parallel()
+	a := mustExtract(t, doc("", `<p>`+filler+`</p><div class="code"><pre><span class="comment">// Set up the pipeline.</span>
+c := gen(2, 3)<span class="comment"> // 4</span></pre></div><p>`+filler+`</p>`))
+	if !hasBlock(a, KindCode, "// Set up the pipeline.\nc := gen(2, 3) // 4") {
+		t.Errorf("code comments lost or block not code: %q", a.Blocks)
+	}
+}
+
+func TestExtractClassifiesHighlightedPreAsCode(t *testing.T) {
+	t.Parallel()
+	a := mustExtract(t, doc("", `<p>`+filler+`</p>
+		<div class="highlight-python3 notranslate"><div class="highlight"><pre>import logging</pre></div></div>
+		<pre class="language-go">x := 1</pre>
+		<pre>A plain verse,
+not code.</pre><p>`+filler+`</p>`))
+	if !hasBlock(a, KindCode, "import logging") || !hasBlock(a, KindCode, "x := 1") {
+		t.Errorf("highlighted <pre> not code: %q", a.Blocks)
+	}
+	if !hasBlock(a, KindPreformatted, "A plain verse,\nnot code.") {
+		t.Errorf("plain <pre> should stay preformatted: %q", a.Blocks)
+	}
+}
+
+func TestExtractRemovesKnownChrome(t *testing.T) {
+	t.Parallel()
+	a := mustExtract(t, doc("", `<div class="shortdescription">Hidden short description</div>
+		<div id="contentSub"><span class="mw-redirectedfrom">(Redirected from X)</span></div>
+		<p>`+filler+`</p>
+		<div class="mw-heading mw-heading2"><h2 id="History">History</h2><span class="mw-editsection">[<a href="/edit">edit</a>]</span></div>
+		<p>`+filler+`</p>
+		<div class="example-header"><span class="language-name">http</span></div><pre><code>GET / HTTP/1.1</code></pre>
+		<div class="reflist"><ol class="references"><li>Dunham, 1999, p. xxiv.</li></ol></div>`))
+	spoken := a.SpokenText()
+	for _, junk := range []string{"Hidden short description", "Redirected from", "edit", "Dunham", "\n\nhttp\n\n"} {
+		if strings.Contains(spoken, junk) {
+			t.Errorf("chrome %q read aloud: %q", junk, spoken)
+		}
+	}
+	if !hasBlock(a, KindHeading, "History") {
+		t.Errorf("Wikipedia heading lost: %q", texts(a))
+	}
+}
+
+func TestExtractPermalinkMustBeSamePageAnchor(t *testing.T) {
+	t.Parallel()
+	a := mustExtract(t, doc("", `<p>See <a href="/usc/230">`+"\u00a7"+`</a> 230 for details. `+filler+`</p>`))
+	if !strings.Contains(texts(a)[0], "See \u00a7 230") {
+		t.Errorf("a real section-sign link was dropped: %q", texts(a)[0])
+	}
+}

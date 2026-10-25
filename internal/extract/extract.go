@@ -118,6 +118,7 @@ func Extract(page []byte, pageURL *url.URL) (Article, error) {
 	if err != nil {
 		return Article{}, fmt.Errorf("%w: parsing HTML: %v", ErrNoContent, err)
 	}
+	prepare(root)
 	parser := readability.NewParser()
 	// Keep the classes the walker needs; readability strips all others.
 	parser.ClassesToPreserve = append(parser.ClassesToPreserve, preservedClasses...)
@@ -183,6 +184,7 @@ func (a Article) SpokenText() string {
 
 // Classes readability must keep for the walker to recognize these elements.
 const (
+	classCode          = "phonetic-code" // set by prepare on code <pre>s
 	classEmoji         = "emoji"
 	classMathInline    = "mwe-math-fallback-image-inline"
 	classMathDisplay   = "mwe-math-fallback-image-display"
@@ -195,7 +197,105 @@ const minLayoutCellWords = 50
 // formulaSpoken stands in for TeX-like math in spoken text.
 const formulaSpoken = "(formula)"
 
-var preservedClasses = []string{classEmoji, classMathInline, classMathDisplay, classWPCaptionText}
+var preservedClasses = []string{classCode, classEmoji, classMathInline, classMathDisplay, classWPCaptionText}
+
+// chromeClasses mark elements that are page chrome on sites readability
+// handles poorly; prepare removes them before readability runs.
+var chromeClasses = []string{
+	"mw-editsection",     // Wikipedia "[edit]" links (their wrapper also hides headings from readability)
+	"reflist",            // Wikipedia reference lists
+	"mw-references-wrap", //
+	"references",         //
+	"shortdescription",   // Wikipedia hidden short description
+	"tagline",            // Wikipedia (mobile skin) page tagline
+	"mw-redirectedfrom",  // Wikipedia "(Redirected from ...)"
+	"example-header",     // MDN code-block language labels
+	"language-name",      //
+}
+
+// chromeIDs are element ids prepare removes.
+var chromeIDs = []string{"contentSub", "siteSub"}
+
+// prepare adjusts the parsed page before readability sees it:
+//   - removes known chrome (chromeClasses, chromeIDs);
+//   - marks <pre>s with a code-highlighting class on them or an ancestor
+//     (see hasCodeHint) with classCode, so code without a <code> child isn't
+//     read aloud as prose;
+//   - strips class and id attributes inside <pre>: they're only syntax
+//     highlighting, and readability deletes elements whose class looks
+//     unlikely (e.g. "comment"), which would remove code comments.
+func prepare(root *html.Node) {
+	var remove []*html.Node
+	var rec func(n *html.Node, codeHint bool)
+	rec = func(n *html.Node, codeHint bool) {
+		if n.Type == html.ElementNode {
+			if isChrome(n) {
+				remove = append(remove, n)
+				return
+			}
+			codeHint = codeHint || hasCodeHint(n)
+			if atom.Lookup([]byte(n.Data)) == atom.Pre {
+				if codeHint {
+					n.Attr = append(n.Attr, html.Attribute{Key: "class", Val: classCode})
+					n.Attr = dropAttr(n.Attr, "id")
+					n.Attr = keepOnlyClass(n.Attr, classCode)
+				}
+				stripHighlighting(n)
+				return
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			rec(c, codeHint)
+		}
+	}
+	rec(root, false)
+	for _, n := range remove {
+		n.Parent.RemoveChild(n)
+	}
+}
+
+func isChrome(n *html.Node) bool {
+	for _, c := range chromeClasses {
+		if hasClass(n, c) {
+			return true
+		}
+	}
+	return slices.Contains(chromeIDs, attr(n, "id"))
+}
+
+// hasCodeHint reports a class marking source code (syntax highlighters,
+// Markdown renderers, Sphinx, Prism, Chroma...).
+func hasCodeHint(n *html.Node) bool {
+	for _, c := range strings.Fields(strings.ToLower(attr(n, "class"))) {
+		switch {
+		case c == "code", c == "sourcecode", c == "prettyprint", c == "chroma",
+			strings.Contains(c, "highlight"),
+			strings.HasPrefix(c, "language-"), strings.HasPrefix(c, "lang-"), strings.HasPrefix(c, "brush:"):
+			return true
+		}
+	}
+	return false
+}
+
+// stripHighlighting removes class and id attributes from everything inside n.
+func stripHighlighting(n *html.Node) {
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		if c.Type == html.ElementNode {
+			c.Attr = dropAttr(dropAttr(c.Attr, "class"), "id")
+		}
+		stripHighlighting(c)
+	}
+}
+
+func dropAttr(attrs []html.Attribute, key string) []html.Attribute {
+	return slices.DeleteFunc(attrs, func(a html.Attribute) bool { return a.Namespace == "" && a.Key == key })
+}
+
+// keepOnlyClass replaces every class attribute with a single one holding class.
+func keepOnlyClass(attrs []html.Attribute, class string) []html.Attribute {
+	attrs = dropAttr(attrs, "class")
+	return append(attrs, html.Attribute{Key: "class", Val: class})
+}
 
 // walker turns the cleaned article tree into blocks and images.
 type walker struct {
@@ -369,7 +469,7 @@ func (w *walker) emitBlock(kind BlockKind, text, source string) {
 func (w *walker) pre(n *html.Node) {
 	w.flush()
 	kind := KindPreformatted
-	if find(n, atom.Code) != nil {
+	if hasClass(n, classCode) || find(n, atom.Code) != nil {
 		kind = KindCode
 	}
 	spoken, source := rawText(n)
@@ -520,9 +620,14 @@ func isBracketOrSpace(r rune) bool { return isSpace(r) || r == '[' || r == ']' }
 // permalinkSymbols are the whole text of heading anchor links ("Section¶").
 var permalinkSymbols = map[string]bool{"\u00b6": true, "#": true, "\u00a7": true, "\U0001F517": true}
 
-// isPermalink reports a link whose only text is a permalink symbol.
+// isPermalink reports a same-page link whose only text is a permalink
+// symbol (a variation selector after the symbol is ignored).
 func isPermalink(a *html.Node) bool {
-	return permalinkSymbols[strings.TrimFunc(textOf(a), isSpace)]
+	if !strings.HasPrefix(attr(a, "href"), "#") {
+		return false
+	}
+	text := strings.TrimFunc(textOf(a), func(r rune) bool { return isSpace(r) || r == '\ufe0f' })
+	return permalinkSymbols[text]
 }
 
 // isLayoutTable guesses whether a table is page layout rather than data,
