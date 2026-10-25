@@ -324,7 +324,7 @@ Each phase ends with something that runs. The goal is to get end-to-end audio in
 - **Done when:** episodes sound like narration rather than a page read aloud, and image-heavy articles are flagged.
 
 ### Phase 7: Hardening
-- Reprocess endpoint; retention cleanup job. The reprocess store method must refuse leased rows (or clear `locked_until` and `lease_id` in the same UPDATE); otherwise the article waits for the old lease to expire.
+- Reprocess endpoint; retention cleanup job. The reprocess store method must refuse leased rows (or clear `locked_until` and `lease_id` in the same UPDATE); otherwise the article waits for the old lease to expire. It must also be able to restart from an earlier stage than `failed_stage` (e.g. extract fails permanently when the fetch output is missing; only re-fetching fixes that).
 - Better failure visibility (e.g. failed articles appear as a short "failed: <title>" episode, or a status endpoint I check).
 - SQLite backups (a periodic `VACUUM INTO`).
 - Fill gaps in test coverage; E2E crash-recovery and retry scenarios.

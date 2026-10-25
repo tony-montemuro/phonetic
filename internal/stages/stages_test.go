@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -19,11 +20,12 @@ import (
 	"github.com/tony-montemuro/phonetic/internal/store"
 )
 
-// articlePage is a page the extractor accepts.
+// articlePage is a page the extractor accepts; its image src is relative, so
+// it resolves differently depending on the page URL.
 var articlePage = `<!doctype html><html lang="en"><head><title>Stage Test Post</title>
 <meta name="author" content="Jane Doe"></head><body><article><h1>Stage Test Post</h1>
 <p>` + strings.Repeat("Plenty of words make this paragraph look like real article content. ", 8) + `</p>
-<figure><img src="/chart.png" alt="Chart"><figcaption>Figure 1</figcaption></figure>
+<figure><img src="chart.png" alt="Chart"><figcaption>Figure 1</figcaption></figure>
 <p>` + strings.Repeat("A second paragraph keeps the reader engaged with more sentences. ", 6) + `</p>
 </article></body></html>`
 
@@ -58,25 +60,54 @@ func claimAt(t *testing.T, s *store.Store, url string, stage store.Status) store
 	}
 }
 
-// fakeFetcher returns a fixed result or error.
+// writeFetchOutput writes what the fetch stage would have produced.
+func writeFetchOutput(t *testing.T, dir artifact.Dir, page, finalURL string) {
+	t.Helper()
+	if err := dir.WriteFile(artifact.RawHTML, []byte(page)); err != nil {
+		t.Fatal(err)
+	}
+	if err := dir.WriteJSON(artifact.FetchMeta, FetchMeta{URL: finalURL}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// fakeFetcher returns a fixed result or error and records the URL asked for.
 type fakeFetcher struct {
 	res fetch.Result
 	err error
+
+	mu  sync.Mutex
+	got []string
 }
 
-func (f fakeFetcher) Fetch(context.Context, string) (fetch.Result, error) { return f.res, f.err }
+func (f *fakeFetcher) Fetch(_ context.Context, url string) (fetch.Result, error) {
+	f.mu.Lock()
+	f.got = append(f.got, url)
+	f.mu.Unlock()
+	return f.res, f.err
+}
+
+// failingMetadata is a MetadataStore whose writes fail.
+type failingMetadata struct{ err error }
+
+func (f failingMetadata) SaveExtracted(context.Context, store.Lease, store.ExtractedMetadata, time.Time) error {
+	return f.err
+}
 
 func TestFetchStageWritesArtifacts(t *testing.T) {
 	t.Parallel()
 	dataDir := t.TempDir()
 	fetchedAt := time.Date(2026, 10, 24, 12, 0, 0, 0, time.FixedZone("CDT", -5*3600))
-	st := Fetch{DataDir: dataDir, Fetcher: fakeFetcher{res: fetch.Result{
+	f := &fakeFetcher{res: fetch.Result{
 		URL: "https://example.com/final", ContentType: "text/html; charset=utf-8",
 		OriginalContentType: "text/html; charset=iso-8859-1", Body: []byte(articlePage), FetchedAt: fetchedAt,
-	}}}
+	}}
 	a := store.Article{ID: 7, URL: "https://example.com/start", Status: store.StatusFetching}
-	if err := st.Run(context.Background(), a); err != nil {
+	if err := (Fetch{DataDir: dataDir, Fetcher: f}).Run(context.Background(), a); err != nil {
 		t.Fatal(err)
+	}
+	if len(f.got) != 1 || f.got[0] != a.URL {
+		t.Errorf("fetched %q, want %q", f.got, a.URL)
 	}
 	dir := artifact.For(dataDir, 7)
 	body, err := dir.ReadFile(artifact.RawHTML)
@@ -97,32 +128,74 @@ func TestFetchStageWritesArtifacts(t *testing.T) {
 func TestFetchStageClassifiesErrors(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
+		name      string
 		err       error
 		permanent bool
 	}{
-		{&fetch.StatusError{Code: http.StatusNotFound}, true},
-		{fmt.Errorf("wrapped: %w", fetch.ErrNotHTML), true},
-		{&fetch.StatusError{Code: http.StatusServiceUnavailable}, false},
-		{context.DeadlineExceeded, false},
+		{"404", &fetch.StatusError{Code: http.StatusNotFound}, true},
+		{"not html", fmt.Errorf("wrapped: %w", fetch.ErrNotHTML), true},
+		{"503", &fetch.StatusError{Code: http.StatusServiceUnavailable}, false},
+		{"timeout", context.DeadlineExceeded, false},
 	}
 	for _, tt := range tests {
-		st := Fetch{DataDir: t.TempDir(), Fetcher: fakeFetcher{err: tt.err}}
-		err := st.Run(context.Background(), store.Article{ID: 1, URL: "https://example.com/"})
-		if err == nil || pipeline.IsPermanent(err) != tt.permanent {
-			t.Errorf("%v: err = %v, permanent = %v, want %v", tt.err, err, pipeline.IsPermanent(err), tt.permanent)
-		}
-		if !errors.Is(err, tt.err) {
-			t.Errorf("%v: original error not wrapped: %v", tt.err, err)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			st := Fetch{DataDir: t.TempDir(), Fetcher: &fakeFetcher{err: tt.err}}
+			err := st.Run(context.Background(), store.Article{ID: 1, URL: "https://example.com/"})
+			if err == nil || pipeline.IsPermanent(err) != tt.permanent {
+				t.Errorf("err = %v, permanent = %v, want %v", err, pipeline.IsPermanent(err), tt.permanent)
+			}
+			if !errors.Is(err, tt.err) {
+				t.Errorf("original error not wrapped: %v", err)
+			}
+		})
+	}
+}
+
+func TestFetchStageWriteFailureIsTransient(t *testing.T) {
+	t.Parallel()
+	file := filepath.Join(t.TempDir(), "not-a-dir")
+	if err := os.WriteFile(file, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f := &fakeFetcher{res: fetch.Result{URL: "https://example.com/", Body: []byte(articlePage)}}
+	err := Fetch{DataDir: file, Fetcher: f}.Run(context.Background(), store.Article{ID: 1, URL: "https://example.com/"})
+	if err == nil || pipeline.IsPermanent(err) {
+		t.Errorf("err = %v, want a transient write error", err)
+	}
+}
+
+func TestStagesDontWriteAfterCancel(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	dataDir := t.TempDir()
+	f := &fakeFetcher{res: fetch.Result{URL: "https://example.com/", Body: []byte(articlePage)}}
+	if err := (Fetch{DataDir: dataDir, Fetcher: f}).Run(ctx, store.Article{ID: 1}); !errors.Is(err, context.Canceled) {
+		t.Errorf("fetch: err = %v, want context.Canceled", err)
+	}
+	if _, err := os.Stat(artifact.For(dataDir, 1).Path(artifact.RawHTML)); err == nil {
+		t.Error("fetch wrote raw.html after cancellation")
+	}
+
+	dir := artifact.For(dataDir, 2)
+	writeFetchOutput(t, dir, articlePage, "https://example.com/post")
+	err := Extract{Store: failingMetadata{}, DataDir: dataDir}.Run(ctx, store.Article{ID: 2})
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("extract: err = %v, want context.Canceled", err)
+	}
+	if _, err := os.Stat(dir.Path(artifact.Extracted)); err == nil {
+		t.Error("extract wrote extracted.json after cancellation")
 	}
 }
 
 // Fetch and extract against a real HTTP server, through the real fetcher.
+// The redirect lands in a subdirectory, so a relative image only resolves
+// correctly against the final URL.
 func TestFetchThenExtract(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/old" {
-			http.Redirect(w, r, "/post", http.StatusMovedPermanently)
+			http.Redirect(w, r, "/blog/2026/post", http.StatusMovedPermanently)
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -140,6 +213,10 @@ func TestFetchThenExtract(t *testing.T) {
 	if err := fetchStage.Run(ctx, a); err != nil {
 		t.Fatal(err)
 	}
+	var meta FetchMeta
+	if err := artifact.For(dataDir, a.ID).ReadJSON(artifact.FetchMeta, &meta); err != nil || meta.URL != srv.URL+"/blog/2026/post" {
+		t.Fatalf("fetch.json URL = %q (%v), want the final URL", meta.URL, err)
+	}
 	if _, err := s.CompleteStage(ctx, store.LeaseOf(a), time.Now()); err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +232,7 @@ func TestFetchThenExtract(t *testing.T) {
 	if err := artifact.For(dataDir, a.ID).ReadJSON(artifact.Extracted, &art); err != nil {
 		t.Fatal(err)
 	}
-	if art.Title != "Stage Test Post" || len(art.Images) != 1 || art.Images[0].URL != srv.URL+"/chart.png" {
+	if art.Title != "Stage Test Post" || len(art.Images) != 1 || art.Images[0].URL != srv.URL+"/blog/2026/chart.png" {
 		t.Errorf("extracted = %+v (image URL must resolve against the final URL)", art)
 	}
 	got, err := s.GetArticle(ctx, a.ID)
@@ -167,29 +244,90 @@ func TestFetchThenExtract(t *testing.T) {
 	}
 }
 
-func TestExtractStageMissingFetchOutputIsPermanent(t *testing.T) {
+// Re-running extract (e.g. on reprocess) overwrites its output and metadata.
+func TestExtractStageIsReRunnable(t *testing.T) {
 	t.Parallel()
 	s := openStore(t)
-	a := claimAt(t, s, "https://example.com/missing", store.StatusExtracting)
-	err := Extract{Store: s, DataDir: t.TempDir()}.Run(context.Background(), a)
-	if err == nil || !pipeline.IsPermanent(err) {
-		t.Errorf("err = %v, want permanent", err)
+	dataDir := t.TempDir()
+	ctx := context.Background()
+	a := claimAt(t, s, "https://example.com/rerun", store.StatusExtracting)
+	dir := artifact.For(dataDir, a.ID)
+	st := Extract{Store: s, DataDir: dataDir}
+
+	writeFetchOutput(t, dir, articlePage, "https://example.com/rerun")
+	if err := st.Run(ctx, a); err != nil {
+		t.Fatal(err)
+	}
+	noImages := strings.Replace(strings.Replace(articlePage, `<meta name="author" content="Jane Doe">`, "", 1),
+		`<figure><img src="chart.png" alt="Chart"><figcaption>Figure 1</figcaption></figure>`, "", 1)
+	writeFetchOutput(t, dir, noImages, "https://example.com/rerun")
+	if err := st.Run(ctx, a); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.GetArticle(ctx, a.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Author != "" || got.ImageCount != 0 {
+		t.Errorf("re-extraction left stale metadata: %+v", got)
+	}
+	var art extract.Article
+	if err := dir.ReadJSON(artifact.Extracted, &art); err != nil || len(art.Images) != 0 {
+		t.Errorf("extracted.json not overwritten: %d images, %v", len(art.Images), err)
+	}
+}
+
+func TestExtractStageInputErrors(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		setup     func(t *testing.T, dir artifact.Dir)
+		permanent bool
+		mention   string
+	}{
+		{"nothing fetched", func(*testing.T, artifact.Dir) {}, true, "re-fetched"},
+		{"raw.html missing", func(t *testing.T, dir artifact.Dir) {
+			if err := dir.WriteJSON(artifact.FetchMeta, FetchMeta{URL: "https://example.com/"}); err != nil {
+				t.Fatal(err)
+			}
+		}, true, "re-fetched"},
+		{"corrupt fetch.json", func(t *testing.T, dir artifact.Dir) {
+			if err := dir.WriteFile(artifact.FetchMeta, []byte("{not json")); err != nil {
+				t.Fatal(err)
+			}
+		}, true, "corrupt"},
+		{"empty final URL", func(t *testing.T, dir artifact.Dir) { writeFetchOutput(t, dir, articlePage, "") }, true, "final URL"},
+		{"relative final URL", func(t *testing.T, dir artifact.Dir) { writeFetchOutput(t, dir, articlePage, "/post") }, true, "final URL"},
+		{"unreadable raw.html", func(t *testing.T, dir artifact.Dir) {
+			writeFetchOutput(t, dir, articlePage, "https://example.com/")
+			// A directory where the file should be: a read error that
+			// isn't "missing", so it may be worth retrying.
+			if err := os.Remove(dir.Path(artifact.RawHTML)); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Mkdir(dir.Path(artifact.RawHTML), 0o755); err != nil {
+				t.Fatal(err)
+			}
+		}, false, "reading fetch output"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dataDir := t.TempDir()
+			tt.setup(t, artifact.For(dataDir, 1))
+			err := Extract{Store: failingMetadata{}, DataDir: dataDir}.Run(context.Background(), store.Article{ID: 1})
+			if err == nil || pipeline.IsPermanent(err) != tt.permanent || !strings.Contains(err.Error(), tt.mention) {
+				t.Errorf("err = %v (permanent %v), want permanent=%v mentioning %q", err, pipeline.IsPermanent(err), tt.permanent, tt.mention)
+			}
+		})
 	}
 }
 
 func TestExtractStageNoContentIsPermanent(t *testing.T) {
 	t.Parallel()
-	s := openStore(t)
 	dataDir := t.TempDir()
-	a := claimAt(t, s, "https://example.com/empty", store.StatusExtracting)
-	dir := artifact.For(dataDir, a.ID)
-	if err := dir.WriteFile(artifact.RawHTML, []byte("<html><body><p>Too short.</p></body></html>")); err != nil {
-		t.Fatal(err)
-	}
-	if err := dir.WriteJSON(artifact.FetchMeta, FetchMeta{URL: "https://example.com/empty"}); err != nil {
-		t.Fatal(err)
-	}
-	err := Extract{Store: s, DataDir: dataDir}.Run(context.Background(), a)
+	dir := artifact.For(dataDir, 1)
+	writeFetchOutput(t, dir, "<html><body><p>Too short.</p></body></html>", "https://example.com/empty")
+	err := Extract{Store: failingMetadata{}, DataDir: dataDir}.Run(context.Background(), store.Article{ID: 1})
 	if !errors.Is(err, extract.ErrNoContent) || !pipeline.IsPermanent(err) {
 		t.Errorf("err = %v, want permanent ErrNoContent", err)
 	}
@@ -198,23 +336,37 @@ func TestExtractStageNoContentIsPermanent(t *testing.T) {
 	}
 }
 
+func TestExtractStageMetadataFailureIsTransient(t *testing.T) {
+	t.Parallel()
+	dataDir := t.TempDir()
+	writeFetchOutput(t, artifact.For(dataDir, 1), articlePage, "https://example.com/post")
+	boom := errors.New("database is locked")
+	err := Extract{Store: failingMetadata{err: boom}, DataDir: dataDir}.Run(context.Background(), store.Article{ID: 1})
+	if !errors.Is(err, boom) || pipeline.IsPermanent(err) || !strings.Contains(err.Error(), "saving metadata") {
+		t.Errorf("err = %v, want a wrapped transient error", err)
+	}
+}
+
 // A stage run under a lost lease must not record metadata.
 func TestExtractStageLostLease(t *testing.T) {
 	t.Parallel()
 	s := openStore(t)
 	dataDir := t.TempDir()
+	ctx := context.Background()
 	a := claimAt(t, s, "https://example.com/lease", store.StatusExtracting)
-	dir := artifact.For(dataDir, a.ID)
-	dir.WriteFile(artifact.RawHTML, []byte(articlePage))
-	dir.WriteJSON(artifact.FetchMeta, FetchMeta{URL: "https://example.com/lease"})
-	if _, err := s.ReleaseAllLeases(context.Background(), time.Now()); err != nil {
+	writeFetchOutput(t, artifact.For(dataDir, a.ID), articlePage, "https://example.com/lease")
+	if _, err := s.ReleaseAllLeases(ctx, time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	err := Extract{Store: s, DataDir: dataDir}.Run(context.Background(), a)
+	err := Extract{Store: s, DataDir: dataDir}.Run(ctx, a)
 	if !errors.Is(err, store.ErrLeaseLost) {
 		t.Errorf("err = %v, want ErrLeaseLost", err)
 	}
-	if got, _ := s.GetArticle(context.Background(), a.ID); got.Title != "" {
+	got, err := s.GetArticle(ctx, a.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Title != "" {
 		t.Errorf("metadata written without the lease: %+v", got)
 	}
 }

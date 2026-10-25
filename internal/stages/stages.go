@@ -5,6 +5,8 @@ package stages
 
 import (
 	"context"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -48,6 +50,15 @@ func (s Fetch) Run(ctx context.Context, a store.Article) error {
 		}
 		return err
 	}
+	// Don't write once cancelled (shutdown or lost lease): narrows the window
+	// in which a superseded worker overwrites the new owner's files.
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	// Two separate atomic writes: a superseded worker could pair its
+	// fetch.json with the new owner's raw.html. Accepted (see package
+	// artifact): both describe the same URL, and stages are re-runnable.
+	// Write errors (e.g. a full disk) are transient: retried with backoff.
 	dir := artifact.For(s.DataDir, a.ID)
 	if err := dir.WriteFile(artifact.RawHTML, res.Body); err != nil {
 		return fmt.Errorf("saving page: %w", err)
@@ -74,8 +85,6 @@ type MetadataStore interface {
 type Extract struct {
 	Store   MetadataStore
 	DataDir string
-	// Now returns the current time; nil means time.Now.
-	Now func() time.Time
 }
 
 // Run implements pipeline.Stage.
@@ -83,51 +92,57 @@ func (s Extract) Run(ctx context.Context, a store.Article) error {
 	dir := artifact.For(s.DataDir, a.ID)
 	var meta FetchMeta
 	if err := dir.ReadJSON(artifact.FetchMeta, &meta); err != nil {
-		return missingInput(err)
+		return inputErr(err)
 	}
 	page, err := dir.ReadFile(artifact.RawHTML)
 	if err != nil {
-		return missingInput(err)
+		return inputErr(err)
 	}
 	pageURL, err := url.Parse(meta.URL)
-	if err != nil {
-		return pipeline.Permanent(fmt.Errorf("bad final URL in %s: %w", artifact.FetchMeta, err))
+	if err != nil || !pageURL.IsAbs() || (pageURL.Scheme != "http" && pageURL.Scheme != "https") {
+		return pipeline.Permanent(fmt.Errorf("fetch output has no usable final URL (%q); the article must be re-fetched", meta.URL))
 	}
 
+	// Extraction is CPU-bound and bounded by the fetcher's size limit, so it
+	// doesn't watch ctx; check it before writing instead.
 	art, err := extract.Extract(page, pageURL)
 	if errors.Is(err, extract.ErrNoContent) {
 		return pipeline.Permanent(err)
 	}
 	if err != nil {
+		return fmt.Errorf("extracting: %w", err)
+	}
+	if err := ctx.Err(); err != nil {
 		return err
 	}
 	if err := dir.WriteJSON(artifact.Extracted, art); err != nil {
 		return fmt.Errorf("saving extraction: %w", err)
 	}
-	return s.Store.SaveExtracted(ctx, store.LeaseOf(a), store.ExtractedMetadata{
+	err = s.Store.SaveExtracted(ctx, store.LeaseOf(a), store.ExtractedMetadata{
 		Title:       art.Title,
 		Author:      art.Byline,
 		SiteName:    art.SiteName,
 		PublishedAt: art.PublishedAt,
 		WordCount:   art.WordCount,
 		ImageCount:  len(art.Images),
-	}, s.now())
+	}, time.Now())
+	if err != nil {
+		return fmt.Errorf("saving metadata: %w", err)
+	}
+	return nil
 }
 
-func (s Extract) now() time.Time {
-	if s.Now != nil {
-		return s.Now()
+// inputErr classifies a failure to read the fetch stage's output. A missing
+// or corrupt file won't be fixed by retrying extract (the article must be
+// re-fetched), so those are permanent; other read errors may be transient.
+func inputErr(err error) error {
+	var syntaxErr *jsontext.SyntacticError
+	var semanticErr *json.SemanticError
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return pipeline.Permanent(fmt.Errorf("fetch output missing; the article must be re-fetched: %w", err))
+	case errors.As(err, &syntaxErr) || errors.As(err, &semanticErr):
+		return pipeline.Permanent(fmt.Errorf("fetch output corrupt; the article must be re-fetched: %w", err))
 	}
-	return time.Now()
-}
-
-// missingInput classifies a failure to read the fetch stage's output. A
-// missing file won't appear by retrying extract (the article needs
-// re-fetching), so that's permanent; other read errors may be transient.
-func missingInput(err error) error {
-	err = fmt.Errorf("reading fetch output: %w", err)
-	if errors.Is(err, fs.ErrNotExist) {
-		return pipeline.Permanent(err)
-	}
-	return err
+	return fmt.Errorf("reading fetch output: %w", err)
 }
