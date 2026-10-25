@@ -85,7 +85,8 @@ Files on disk, one directory per article:
 data/
   phonetic.db
   articles/<id>/
-    raw.html          # fetch output
+    raw.html          # fetch output (converted to UTF-8)
+    fetch.json        # fetch metadata: final URL after redirects, content type, time
     extracted.json    # readability output: title, byline, text, image list
     script.txt        # text for TTS (LLM output, or extracted text as a fallback)
     analysis.json     # LLM image analysis
