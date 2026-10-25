@@ -53,7 +53,7 @@ One Go binary runs the HTTP server and the background workers. Kokoro runs next 
 | Language | Go | Standard library first: `net/http`, `encoding/xml`, `database/sql`, `log/slog`, `os/exec`. |
 | Database | SQLite via `modernc.org/sqlite` | Pure Go, no C compiler needed. WAL mode. |
 | Fetch | `net/http` GET | Realistic User-Agent, timeout, size limit. Headless browser (`chromedp`) deferred. |
-| Extraction | `github.com/go-shiori/go-readability` | Port of Firefox Reader View. Brings in `golang.org/x/net/html`. |
+| Extraction | `codeberg.org/readeck/go-readability/v2` | Port of Firefox Reader View (actively maintained Readeck fork; the original go-shiori module is untagged and stale). We parse with `golang.org/x/net/html` ourselves and walk the cleaned tree into typed blocks. |
 | LLM | Claude API, Haiku 5.5, behind an `LLM` interface | About $0.10 / $0.50 per million input/output tokens under 100k-token prompts, so fractions of a cent per article. Look up the exact model ID from the Models API. Official Go SDK (`github.com/anthropics/anthropic-sdk-go`) vs. raw `net/http`: decide in Phase 6. A `claude -p` adapter is possible later. |
 | TTS | `TTS` interface; Kokoro first | Kokoro-FastAPI in Docker serves an OpenAI-compatible `/v1/audio/speech`, so one adapter also covers OpenAI and similar hosted services. Piper adapter (runs the CLI) later. |
 | Audio | `ffmpeg` (external binary) | Joins chunk audio into a single MP3 and reads the duration. |
@@ -87,7 +87,7 @@ data/
   articles/<id>/
     raw.html          # fetch output (converted to UTF-8)
     fetch.json        # fetch metadata: final URL after redirects, content type, time
-    extracted.json    # readability output: title, byline, text, image list
+    extracted.json    # extraction: metadata, typed blocks (paragraph/heading/list_item/quote/caption/preformatted/code/table), images with context
     script.txt        # text for TTS (LLM output, or extracted text as a fallback)
     analysis.json     # LLM image analysis
     chunks/           # intermediate TTS audio (deleted when done)
