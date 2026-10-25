@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/net/html"
 )
 
 var pageURL, _ = url.Parse("https://example.com/posts/1")
@@ -636,18 +638,55 @@ func TestExtractPermalinkMustBeSamePageAnchor(t *testing.T) {
 	}
 }
 
-// React streaming SSR (e.g. LessWrong): the article arrives in hidden
-// <div id="S:n"> chunks, moved into <template id="B:n"> placeholders by
-// script. Chunks can nest.
+// React streaming SSR (e.g. LessWrong): content arrives in hidden chunks,
+// placed by $RC (boundary, with a fallback to discard) and $RS (segment)
+// scripts. Ids are paired from the scripts, not by number.
 func TestExtractResolvesReactStreamedContent(t *testing.T) {
 	t.Parallel()
 	page := `<!doctype html><html><head><title>Streamed Post</title></head><body>
-		<div id="root"><template id="B:0"></template></div>
-		<div hidden id="S:0"><main><h1>Streamed Post</h1><template id="P:1"></template></main></div>
-		<div hidden id="S:1"><article><p>` + filler + `</p><p>Second paragraph. ` + filler + `</p></article></div>
-		<script>$RC("B:0","S:0");$RS("S:1","P:1")</script></body></html>`
+		<div id="root"><!--$?--><template id="B:0"></template><p>Loading the article, please wait...</p><!--/$--></div>
+		<div hidden id="S:2"><main><h1>Streamed Post</h1><template id="P:5"></template></main></div>
+		<div hidden id="S:7"><article><p>` + filler + `</p><p>Second paragraph. ` + filler + `</p></article></div>
+		<div hidden id="S:9"><p>Unrelated hidden text that must stay hidden. ` + filler + `</p></div>
+		<script>$RC("B:0","S:2");$RS("S:7","P:5")</script></body></html>`
 	a := mustExtract(t, page)
-	if len(a.Blocks) < 2 || !strings.HasPrefix(a.Blocks[len(a.Blocks)-1].Text, "Second paragraph.") {
+	spoken := a.SpokenText()
+	if !strings.Contains(spoken, "Second paragraph.") {
 		t.Errorf("streamed content not resolved: %q", texts(a))
+	}
+	if strings.Contains(spoken, "Loading the article") {
+		t.Errorf("Suspense fallback read aloud: %q", spoken)
+	}
+	if strings.Contains(spoken, "Unrelated hidden text") {
+		t.Errorf("a hidden element without an instruction was revealed: %q", spoken)
+	}
+}
+
+// Without React's scripts, look-alike ids are ordinary page content.
+func TestExtractIgnoresStreamingIDsWithoutScripts(t *testing.T) {
+	t.Parallel()
+	page := doc("", `<p>`+filler+`</p><template id="B:1"><p>template</p></template><div hidden id="S:1"><p>Secret hidden text. `+filler+`</p></div><p>`+filler+`</p>`)
+	a := mustExtract(t, page)
+	if strings.Contains(a.SpokenText(), "Secret hidden text") {
+		t.Errorf("non-React page was restructured: %q", texts(a))
+	}
+}
+
+func TestCompleteBoundaryNestedMarkers(t *testing.T) {
+	t.Parallel()
+	page := `<html><head><title>T</title></head><body><div id="r"><!--$?--><template id="B:0"></template>` +
+		`<div>fallback <!--$-->inner<!--/$--> more</div><!--/$--><span>after</span></div>` +
+		`<div hidden id="S:0"><p>content</p></div><script>$RC("B:0","S:0")</script></body></html>`
+	root, err := html.Parse(strings.NewReader(page))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolveStreamedContent(root)
+	var b strings.Builder
+	html.Render(&b, root)
+	got := b.String()
+	if !strings.Contains(got, `<div id="r"><!--$--><p>content</p><!--/$--><span>after</span></div>`) ||
+		strings.Contains(got, "fallback") || strings.Contains(got, `id="S:0"`) {
+		t.Errorf("boundary not completed correctly:\n%s", got)
 	}
 }

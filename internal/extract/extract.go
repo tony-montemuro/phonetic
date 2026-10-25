@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -261,51 +262,117 @@ func prepare(root *html.Node) {
 	}
 }
 
+// reactInstruction matches the inline-script calls React's streaming
+// renderer uses to place late content: $RC/$RR("B:x","S:y") complete a
+// Suspense boundary, $RS("S:y","P:x") a segment.
+var reactInstruction = regexp.MustCompile(`\$(RC|RR|RS)\("([^"]+)","([^"]+)"`)
+
 // resolveStreamedContent does what React's streaming server rendering does
-// in the browser: content arrives later in the page as <div hidden
-// id="S:n">, and a script moves it into its placeholder, <template
-// id="B:n"> (a Suspense boundary, $RC) or <template id="P:n"> (a segment,
-// $RS). Without this, readability (which skips hidden elements) sees only
-// placeholders. Streamed chunks can contain further placeholders, so it
-// repeats until nothing more resolves.
+// in the browser (React 18/19 "Fizz"): content arrives later in the page in a
+// hidden container (usually <div hidden id="S:y">), and inline scripts move
+// it into place:
+//   - $RC/$RR("B:x","S:y"): the boundary between <!--$?--> and <!--/$-->
+//     (template B:x plus fallback content such as a spinner) is replaced by
+//     the content;
+//   - $RS("S:y","P:x"): template P:x is replaced by the content.
+//
+// Without this, readability (which skips hidden elements) sees only
+// placeholders and fallbacks. Pairing comes from the scripts themselves, so
+// pages without them are never touched. Known gap: React's external runtime
+// (data-bid/data-sid attributes instead of inline scripts) isn't handled.
 func resolveStreamedContent(root *html.Node) {
-	for {
-		templates := map[string]*html.Node{}
-		chunks := map[string]*html.Node{}
-		var rec func(*html.Node)
-		rec = func(n *html.Node) {
-			if n.Type == html.ElementNode {
-				id := attr(n, "id")
-				switch tag := atom.Lookup([]byte(n.Data)); {
-				case tag == atom.Template && (strings.HasPrefix(id, "B:") || strings.HasPrefix(id, "P:")):
-					templates[id[2:]] = n
-				case tag == atom.Div && strings.HasPrefix(id, "S:") && hasAttr(n, "hidden"):
-					chunks[strings.TrimPrefix(id, "S:")] = n
+	var calls [][]string
+	byID := map[string]*html.Node{}
+	var rec func(*html.Node)
+	rec = func(n *html.Node) {
+		if n.Type == html.ElementNode {
+			if id := attr(n, "id"); id != "" {
+				if _, dup := byID[id]; !dup {
+					byID[id] = n
 				}
 			}
-			for c := n.FirstChild; c != nil; c = c.NextSibling {
-				rec(c)
+			if atom.Lookup([]byte(n.Data)) == atom.Script {
+				for c := n.FirstChild; c != nil; c = c.NextSibling {
+					if c.Type == html.TextNode {
+						calls = append(calls, reactInstruction.FindAllStringSubmatch(c.Data, -1)...)
+					}
+				}
 			}
 		}
-		rec(root)
-		moved := false
-		for key, tmpl := range templates {
-			chunk, ok := chunks[key]
-			if !ok || tmpl.Parent == nil || isAncestor(chunk, tmpl) {
-				continue
-			}
-			for chunk.FirstChild != nil {
-				c := chunk.FirstChild
-				chunk.RemoveChild(c)
-				tmpl.Parent.InsertBefore(c, tmpl)
-			}
-			tmpl.Parent.RemoveChild(tmpl)
-			chunk.Parent.RemoveChild(chunk)
-			moved = true
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			rec(c)
 		}
-		if !moved {
-			return
+	}
+	rec(root)
+	for _, call := range calls { // document order, as the browser runs them
+		kind, a, b := call[1], call[2], call[3]
+		placeholder, chunk := byID[a], byID[b]
+		if kind == "RS" {
+			placeholder, chunk = byID[b], byID[a]
 		}
+		if placeholder == nil || chunk == nil || placeholder.Parent == nil || chunk.Parent == nil ||
+			isAncestor(chunk, placeholder) {
+			continue
+		}
+		if kind == "RS" {
+			moveChildrenBefore(chunk, placeholder)
+			placeholder.Parent.RemoveChild(placeholder)
+		} else {
+			completeBoundary(placeholder, chunk)
+		}
+		removeChunk(chunk)
+	}
+}
+
+// completeBoundary replaces a Suspense boundary's fallback with its content.
+// The boundary is marked by comments: <!--$?--><template id="B:x">fallback
+// <!--/$-->. Without the markers, the content just replaces the template.
+func completeBoundary(tmpl, chunk *html.Node) {
+	start := tmpl.PrevSibling
+	if start == nil || start.Type != html.CommentNode || start.Data != "$?" {
+		moveChildrenBefore(chunk, tmpl)
+		tmpl.Parent.RemoveChild(tmpl)
+		return
+	}
+	// Remove everything up to the matching <!--/$-->, tracking nesting.
+	depth := 0
+	n := start.NextSibling
+	for n != nil {
+		next := n.NextSibling
+		if n.Type == html.CommentNode {
+			switch n.Data {
+			case "/$":
+				if depth == 0 {
+					moveChildrenBefore(chunk, n)
+					start.Data = "$"
+					return
+				}
+				depth--
+			case "$", "$?", "$!":
+				depth++
+			}
+		}
+		n.Parent.RemoveChild(n)
+		n = next
+	}
+}
+
+func moveChildrenBefore(from, before *html.Node) {
+	for from.FirstChild != nil {
+		c := from.FirstChild
+		from.RemoveChild(c)
+		before.Parent.InsertBefore(c, before)
+	}
+}
+
+// removeChunk removes an emptied content container, and its hidden wrapper
+// if it had one (React uses <table hidden><tbody id="S:y"> and similar for
+// content that can't live in a div).
+func removeChunk(chunk *html.Node) {
+	parent := chunk.Parent
+	parent.RemoveChild(chunk)
+	if parent.Type == html.ElementNode && hasAttr(parent, "hidden") && parent.FirstChild == nil && parent.Parent != nil {
+		parent.Parent.RemoveChild(parent)
 	}
 }
 
