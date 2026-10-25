@@ -1,0 +1,286 @@
+{
+  "title": "Podcast",
+  "byline": "Contributors to Wikimedia projects",
+  "site_name": "Wikimedia Foundation, Inc.",
+  "language": "en",
+  "excerpt": "A podcast is a program made available in digital format for download over the Internet.[1][2] Podcasts are primarily an audio medium, which is reflected in the term itself, a portmanteau of \"iPod\" and \"broadcast\" coined in 2004. The term used to refer to an episodic series of digital audio files…",
+  "lead_image": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e9/Serial_Podcast.jpg/1280px-Serial_Podcast.jpg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=thumbnail",
+  "published_at": "2004-10-02T18:10:02Z",
+  "blocks": [
+    {
+      "kind": "paragraph",
+      "text": "A podcast is a program made available in digital format for download over the Internet. Podcasts are primarily an audio medium, which is reflected in the term itself, a portmanteau of \"iPod\" and \"broadcast\" coined in 2004. The term used to refer to an episodic series of digital audio files that users can download to a personal device or stream to listen to at a time of their choosing. In the mid-2020s, however, video podcasts, either as primary content included in the feed, or as an external supplement to audio, have been popularized. In 2025, Bloomberg reported that a billion people were watching podcasts on video platform YouTube every month. This can cause issues where the audio-only experience suffers when something is shown to viewers in a manner that is not apparent to audio listeners."
+    },
+    {
+      "kind": "paragraph",
+      "text": "A podcast series usually features one or more recurring hosts engaged in a discussion about a particular topic or current event. Podcast content varies widely in structure, ranging from carefully scripted productions to improvised discussions. Podcasts combine elaborate and artistic sound production with thematic concerns ranging from scientific research to slice-of-life journalism. Many podcast series provide an associated website or page with links, and show notes, guest biographies, transcripts, additional resources, commentary, and occasionally a community forum dedicated to discussing the show's content."
+    },
+    {
+      "kind": "paragraph",
+      "text": "The cost to the consumer is low, and many podcasts are free to download. Some podcasts are underwritten by corporations or sponsored, with the inclusion of commercial advertisements. In other cases, a podcast could be a business venture supported by some combination of a paid subscription model, advertising or product delivered after sale. Because podcast content is often free, podcasting is often classified as a disruptive medium, adverse to the maintenance of traditional revenue models."
+    },
+    {
+      "kind": "paragraph",
+      "text": "Podcasting is the preparation and distribution of audio or video files using RSS feeds to the devices of subscribed users. A podcaster normally buys this service from a podcast hosting company such as SoundCloud or Libsyn. Hosting companies then distribute these media files to podcast directories and streaming services, such as Apple, Spotify, and YouTube, which users can listen to and watch on their smartphones or digital music and multimedia players or smart televisions."
+    },
+    {
+      "kind": "paragraph",
+      "text": "As of August 2026, the Podcast Index listed about 4.7 million podcast feeds, of which about 438,000 had published an episode in the previous 90 days."
+    },
+    {
+      "kind": "heading",
+      "text": "Etymology"
+    },
+    {
+      "kind": "paragraph",
+      "text": "\"Podcast\" is a portmanteau of \"iPod\" and \"broadcast\". The earliest use of \"podcasting\" was traced to The Guardian columnist and BBC journalist Ben Hammersley, who coined it in early February 2004 while writing an article for The Guardian newspaper. The term was first used in the audioblogging community in September 2004, when Danny Gregoire introduced it in a message to the iPodder-dev mailing list, from where it was adopted by podcaster Adam Curry. Despite the etymology, the content can be accessed using any computer or similar device that can play media files. The term \"podcast\" predates Apple's addition of podcasting features to the iPod and the iTunes software."
+    },
+    {
+      "kind": "heading",
+      "text": "History"
+    },
+    {
+      "kind": "paragraph",
+      "text": "Salespoint was a sales training program created in 1965 by Frank Siedel and his scriptwriting firm, Storycraft, for the Westinghouse Electric Corporation Large Rotating Apparatus Division. Using Philips compact cassette tape recorders — then a new technology designed and marketed for portable voice dictation and business note-taking — Storycraft produced 60-minute audio programs that salespeople could listen to in their cars. The program ran for at least ten years. Its mobility, direct delivery to listeners, and inventive use of new technology make Salespoint an early ancestor of the modern podcast."
+    },
+    {
+      "kind": "paragraph",
+      "text": "In September 2000, early MP3 player manufacturer i2Go offered a service called MyAudio2Go.com which allowed users to download news stories for listening on a PC or MP3 player. The service was available for about a year until i2Go's demise in 2001."
+    },
+    {
+      "kind": "paragraph",
+      "text": "In October 2000, the concept of attaching sound and video files in RSS feeds was proposed in a draft by Tristan Louis. The idea was implemented by Dave Winer, a software developer and an author of the RSS format."
+    },
+    {
+      "kind": "paragraph",
+      "text": "In August 2004, Adam Curry launched his show Daily Source Code, focused on chronicling his everyday life, delivering news, and discussions about the development of podcasting. Curry promoted new and emerging internet audio shows in an attempt to gain traction in the development of what would come to be known as podcasting. Daily Source Code was initially directed at podcast developers. As its audience became interested in the format, these developers were inspired to create and produce their own projects and a community of pioneer podcasters quickly developed."
+    },
+    {
+      "kind": "paragraph",
+      "text": "iPodderX, released in September 2004 by August Trometer and based on earlier work by Ray Slakinski, was the first GUI application for podcasts."
+    },
+    {
+      "kind": "paragraph",
+      "text": "In June 2005, Apple released iTunes 4.9, which added formal support for podcasts, thus negating the need to use a separate program in order to download and transfer them to a mobile device. Additionally, Apple issued cease-and-desist orders to many podcast application developers and service providers for using the term \"iPod\" or \"Pod\" in their products' names."
+    },
+    {
+      "kind": "paragraph",
+      "text": "In February 2006, following London radio station LBC's successful launch of the first premium-podcasting platform, LBC Plus, there was widespread acceptance that podcasting had considerable commercial potential. UK comedian Ricky Gervais, whose first season of The Ricky Gervais Show became a big hit, launched a new series of the popular podcast. The first series of The Ricky Gervais Show podcast had been freely distributed by the Positive Internet Company and marketed through The Guardian newspaper's website, and it was the world's most successful podcast for several years, eventually gaining more than 300 million unique downloads by March 2011. The second series of the podcast was distributed through audible.co.uk and was the first major podcast to charge consumers to download the show (at a rate of 95 pence per half-hour episode). Even in its new subscription format, The Ricky Gervais Show was regularly the most-downloaded podcast on iTunes. The Adam Carolla Show claimed a new Guinness world record, with total downloads approaching 60 million, but Guinness failed to acknowledge that Gervais's podcast had more than 5 times as many downloads as Carolla's show at the time that this new record was supposedly set."
+    },
+    {
+      "kind": "paragraph",
+      "text": "By 2007, audio podcasts were doing what was historically accomplished via radio broadcasts, which had been the source of radio talk shows and news programs since the 1930s. This shift occurred as a result of the evolution of internet capabilities along with increased consumer access to cheaper hardware and software for audio recording and editing."
+    },
+    {
+      "kind": "paragraph",
+      "text": "As of early 2019, the podcasting industry still generated little overall revenue, although the number of persons listening to podcasts continued to grow steadily. Edison Research, which issues the Podcast Consumer quarterly tracking-report, estimated that 90 million persons in the U.S. had listened to a podcast in January 2019. In 2020, 58% of the population of South Korea and 40% of the population of Spain had listened to a podcast in the last month; 12.5% of the UK population had listened to a podcast in the last week; and 22% of the United States population listened to at least one podcast weekly. The form is also acclaimed for its low overhead for creators to start and maintain podcasting, merely requiring a microphone, a computer or mobile device, and associated software to edit and upload the final product. Some form of acoustic quieting is also often utilised."
+    },
+    {
+      "kind": "heading",
+      "text": "IP issues in trademark and patent law"
+    },
+    {
+      "kind": "heading",
+      "text": "Trademark applications"
+    },
+    {
+      "kind": "paragraph",
+      "text": "Between February 10 and March 25, 2005, Shae Spencer Management, LLC of Fairport, New York filed a trademark application to register the term \"podcast\" for an \"online pre-recorded radio program over the internet\". On September 9, 2005, the United States Patent and Trademark Office (USPTO) rejected the application, citing Wikipedia's entry on \"Podcast\" as describing the history of the term. The company amended their application in March 2006, but the USPTO rejected the amended application as not sufficiently differentiated from the original. In November 2006, the application was marked as abandoned."
+    },
+    {
+      "kind": "heading",
+      "text": "Apple trademark protections"
+    },
+    {
+      "kind": "paragraph",
+      "text": "On September 26, 2004, it was reported that Apple Inc. had started to crack down on businesses using the string \"POD\", in product and company names. Apple sent a cease-and-desist letter that week to Podcast Ready, Inc., which markets an application known as \"myPodder\". Lawyers for Apple contended that the term \"pod\" had been used by the public to refer to Apple's music player so extensively that it falls under Apple's trademark cover. Such activity was speculated to be part of a bigger campaign for Apple to expand the scope of its existing iPod trademark, which included trademarking \"IPOD\", \"IPODCAST\", and \"POD\". On November 16, 2006, the Apple Trademark Department stated that \"Apple does not object to third-party usage of the generic term 'podcast' to accurately refer to podcasting services\" and that \"Apple does not license the term\". However, no statement was made as to whether or not Apple believed they held rights to it."
+    },
+    {
+      "kind": "heading",
+      "text": "Personal Audio lawsuits"
+    },
+    {
+      "kind": "paragraph",
+      "text": "Personal Audio, a company referred to as a \"patent troll\" by the Electronic Frontier Foundation (EFF), filed a patent on podcasting in 2009 for a claimed invention in 1996. In February 2013, Personal Audio started suing high-profile podcasters for royalties, including The Adam Carolla Show and the HowStuffWorks podcasts. In October 2013, the EFF filed a petition with the US Trademark Office to invalidate the Personal Audio patent. On August 18, 2014, the EFF announced that Adam Carolla had settled with Personal Audio. Finally, on April 10, 2015, the U.S. Patent and Trademark Office invalidated five provisions of Personal Audio's podcasting patent."
+    },
+    {
+      "kind": "heading",
+      "text": "Production and listening"
+    },
+    {
+      "kind": "paragraph",
+      "text": "A podcast generator maintains a central list of the files on a server as a web feed that one can access through the Internet. The listener or viewer uses special client application software on a computer or media player, known as a podcast client, which accesses this web feed, checks it for updates, and downloads any new files in the series. This process can be automated to download new files automatically, so it may seem to listeners as though podcasters broadcast or \"push\" new episodes to them. Podcast files can be stored locally on the user's device, or streamed directly. There are several different mobile applications that allow people to follow and listen to podcasts. Many of these applications allow users to download podcasts or stream them on demand. Most podcast players or applications allow listeners to skip around the podcast and to control the playback speed. Much podcast listening occurs during commuting; because of restrictions on travel during the COVID-19 pandemic, the number of unique listeners in the US decreased by 15% in the last three weeks of March 2020."
+    },
+    {
+      "kind": "paragraph",
+      "text": "Podcasting has been considered a converged medium (a medium that brings together audio, the web and portable media players), as well as a disruptive technology that has caused some individuals in radio broadcasting to reconsider established practices and preconceptions about audiences, consumption, production and distribution. The New York Times reported in 2025 that podcasts have become an alternative to late-night talk show appearances or magazine covers for public figures to promote their projects, owing to its friendlier, more intimate setting which allows the guest to be more candid."
+    },
+    {
+      "kind": "paragraph",
+      "text": "Podcasts can be produced at little to no cost and are usually disseminated free-of-charge, which sets this medium apart from the traditional 20th-century model of \"gate-kept\" media and their production tools. Podcasters can, however, still monetize their podcasts by allowing companies to purchase ad time. They can also garner support from listeners through crowdfunding websites like Patreon, which provide special extras and content to listeners for a fee."
+    },
+    {
+      "kind": "heading",
+      "text": "Types of podcasts"
+    },
+    {
+      "kind": "paragraph",
+      "text": "Podcasts vary in style, format, and topical content. Podcasts are partially patterned on previous media genres but depart from them systematically in certain computationally observable stylistic respects. The conventions and constraints which govern that variation are emerging and vary over time and markets; podcast listeners have various preferences of styles but conventions to address them and communicate about them are still unformed. Some current examples of types of podcasts are given below. This list is likely to change as new types of content, new technology to consume podcasts, and new use cases emerge."
+    },
+    {
+      "kind": "heading",
+      "text": "Video podcasts"
+    },
+    {
+      "kind": "paragraph",
+      "text": "A video podcast is a podcast that features video content. Web series are often distributed as video podcasts. Dead End Days, a serialized dark comedy about zombies released from October 31, 2003, through 2004, is one early video podcast."
+    },
+    {
+      "kind": "heading",
+      "text": "Enhanced podcasts"
+    },
+    {
+      "kind": "paragraph",
+      "text": "An enhanced podcast, also known as a slidecast, is a type of podcast that combines audio with a slide show presentation. It is similar to a video podcast in that it combines dynamically generated imagery with audio synchronization, but it is different in that it uses presentation software to create the imagery and the sequence of display separately from the time of the original audio podcast recording. The Free Dictionary, YourDictionary, and PC Magazine define an enhanced podcast as \"an electronic slide show delivered as a podcast\". Enhanced podcasts are podcasts that incorporate graphics and chapters. iTunes developed an enhanced podcast feature called \"Audio Hyperlinking\" that they patented in 2012. Enhanced podcasts can be used by businesses or in education. Enhanced podcasts can be created using QuickTime AAC or Windows Media files. Enhanced podcasts were first used in 2006."
+    },
+    {
+      "kind": "heading",
+      "text": "Fiction podcast"
+    },
+    {
+      "kind": "paragraph",
+      "text": "A fiction podcast (also referred to as a \"scripted podcast\" or \"audio drama\") is similar to a radio drama, but in podcast form. They deliver a fictional story, usually told over multiple episodes and seasons, using multiple voice actors, dialogue, sound effects, and music to enrich the story. Welcome to Night Vale (2012), a surrealist community radio comedy-horror series, is widely credited with bringing fiction podcasting to mainstream awareness, with academic scholarship identifying it as a catalyst for the revival of radio drama through podcasting infrastructure. The Bright Sessions (2015), created by Lauren Shippen, became one of the most critically acclaimed independent audio dramas of the late 2010s, earning coverage from outlets including Wired and IndieWire and spawning a trilogy of novels published by Tor Teen. Homecoming (2016), produced by Gimlet Media and starring Catherine Keener, Oscar Isaac, and David Schwimmer, demonstrated the commercial viability of the format; it was nominated for a Peabody Award and later adapted as a Golden Globe-nominated Amazon Prime Video television series. Fiction podcasts have attracted well-known actors as voice talent, including Demi Moore and Matthew McConaughey, as well as investment from Netflix, Spotify, Marvel Comics, and DC Comics. Unlike other podcast genres, downloads of fiction podcasts increased by 19% early in the COVID-19 pandemic."
+    },
+    {
+      "kind": "heading",
+      "text": "Podcast novels"
+    },
+    {
+      "kind": "paragraph",
+      "text": "A podcast novel (also known as a \"serialized audiobook\" or \"podcast audiobook\") is a literary form that combines the concepts of a podcast and an audiobook. Like a traditional novel, a podcast novel is a work of literary fiction; however, it is recorded into episodes that are delivered online over a period of time. The episodes may be delivered automatically via RSS or through a website, blog, or other syndication method. Episodes can be released on a regular schedule, e.g., once a week, or irregularly as each episode is completed. In the same manner as audiobooks, some podcast novels are elaborately narrated with sound effects and separate voice actors for each character, similar to a radio play or scripted podcast, but many have a single narrator and few or no sound effects."
+    },
+    {
+      "kind": "paragraph",
+      "text": "Some podcast novelists give away a free podcast version of their book as a form of promotion. On occasion such novelists have secured publishing contracts to have their novels printed. Podcast novelists have commented that podcasting their novels lets them build audiences even if they cannot get a publisher to buy their books. These audiences then make it easier to secure a printing deal with a publisher at a later date. These podcast novelists also claim the exposure that releasing a free podcast gains them makes up for the fact that they are giving away their work for free."
+    },
+    {
+      "kind": "heading",
+      "text": "Live podcasts"
+    },
+    {
+      "kind": "paragraph",
+      "text": "A number of podcasts are recorded either in total or for specific episodes in front of a live audience. Ticket sales allow the podcasters an additional way of monetizing. Some podcasts create specific live shows to tour which are not necessarily included on the podcast feed. Events including the London Podcast Festival, SF Sketchfest and others regularly give a platform for podcasters to perform live to audiences."
+    },
+    {
+      "kind": "heading",
+      "text": "Production technology"
+    },
+    {
+      "kind": "heading",
+      "text": "Software"
+    },
+    {
+      "kind": "paragraph",
+      "text": "Podcast episodes are widely stored and encoded in the mp3 digital audio format and then hosted on dedicated or shared webserver space. Syndication of podcasts' episodes across various websites and platforms is based on RSS feeds, an XML-formatted file citing information about the episode and the podcast itself."
+    },
+    {
+      "kind": "heading",
+      "text": "Hardware"
+    },
+    {
+      "kind": "paragraph",
+      "text": "The most basic equipment for a podcast is a computer and a microphone. It is helpful to have a sound-proof room and headphones. The computer should have a recording or streaming application installed. Typical microphones for podcasting are connected using USB. If the podcast involves two or more people, each person requires a microphone, and a USB audio interface is needed to mix them together. If the podcast includes video, then a separate webcam might be needed, and additional lighting."
+    },
+    {
+      "kind": "heading",
+      "text": "Global market"
+    },
+    {
+      "kind": "paragraph",
+      "text": "The number of Chinese podcast listeners exceeded 220 million in 2023. India has emerged as the third-largest podcast listening market after China and the US, with over 57.6 million listeners. According to The Free Press Journal, in 2021 \"India will have 95 million Podcast monthly active users\", which is thirty-four percent more than the previous year."
+    },
+    {
+      "kind": "heading",
+      "text": "See also"
+    },
+    {
+      "kind": "heading",
+      "text": "References"
+    },
+    {
+      "kind": "heading",
+      "text": "Further reading"
+    },
+    {
+      "kind": "list_item",
+      "text": "Geoghegan, Michael W.; Klass, Dan (August 16, 2005). Podcast Solutions: The Complete Guide to Podcasting. Apress. ISBN 9781430200543."
+    },
+    {
+      "kind": "list_item",
+      "text": "Meinzer, Kristen (August 6, 2019). So You Want to Start a Podcast: Finding Your Voice, Telling Your Story, and Building a Community That Will Listen. William Morrow. ISBN 9780062936684."
+    },
+    {
+      "kind": "list_item",
+      "text": "Morris, Tee; Tomasi, Chuck (September 15, 2017). Podcasting For Dummies. Wiley. ISBN 9781119412267."
+    },
+    {
+      "kind": "list_item",
+      "text": "Shearer, Elisa; Liedke, Jacob; Matsa, Katerina Eva; Lipka, Michael; Jurkowitz, Mark (April 18, 2023). Podcasts as a Source of News and Information (PDF) (Report). Pew Research Center. Retrieved August 11, 2025."
+    },
+    {
+      "kind": "list_item",
+      "text": "Stocking, Galen; Matsa, Katerina Eva; Naseer, Sarah; St. Aubin, Christopher; Shearer, Elisa; Jurkowitz, Mark; Ghosh, Shreenita (June 15, 2023). A Profile of the Top-Ranked Podcasts in the U.S. (PDF) (Report). Pew Research Center. Retrieved August 11, 2025."
+    },
+    {
+      "kind": "heading",
+      "text": "External links"
+    },
+    {
+      "kind": "paragraph",
+      "text": "This audio file is based on a version from this article dated 30 October 2024, and does not reflect subsequent edits."
+    },
+    {
+      "kind": "paragraph",
+      "text": "Look up podcast in Wiktionary, the free dictionary."
+    }
+  ],
+  "word_count": 3083,
+  "images": [
+    {
+      "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e9/Serial_Podcast.jpg/500px-Serial_Podcast.jpg?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail",
+      "caption": "An episode of a podcast playing on a smartphone",
+      "context": "…to audio, have been popularized. In 2025, Bloomberg reported that a billion people were watching podcasts on video platform YouTube every month. This can cause issues where the audio-only experience suffers when something is shown to viewers in a manner that is not apparent to audio listeners. … A podcast series usually features one or more recurring hosts engaged in a discussion about a particular topic or current event. Podcast content varies widely in structure, ranging from carefully scripted productions to improvised discussions. Podcasts combine elaborate and artistic sound…",
+      "block": 1
+    },
+    {
+      "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/87/Gnome-mime-sound-openclipart.svg/120px-Gnome-mime-sound-openclipart.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail",
+      "context": "…to audio, have been popularized. In 2025, Bloomberg reported that a billion people were watching podcasts on video platform YouTube every month. This can cause issues where the audio-only experience suffers when something is shown to viewers in a manner that is not apparent to audio listeners. … A podcast series usually features one or more recurring hosts engaged in a discussion about a particular topic or current event. Podcast content varies widely in structure, ranging from carefully scripted productions to improvised discussions. Podcasts combine elaborate and artistic sound…",
+      "block": 1
+    },
+    {
+      "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e7/Podcasts_%28iOS%29.svg/250px-Podcasts_%28iOS%29.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail",
+      "caption": "The logo used by Apple to represent podcasting in Apple Podcasts",
+      "context": "…podcast on iTunes. The Adam Carolla Show claimed a new Guinness world record, with total downloads approaching 60 million, but Guinness failed to acknowledge that Gervais's podcast had more than 5 times as many downloads as Carolla's show at the time that this new record was supposedly set. … By 2007, audio podcasts were doing what was historically accomplished via radio broadcasts, which had been the source of radio talk shows and news programs since the 1930s. This shift occurred as a result of the evolution of internet capabilities along with increased consumer access to cheaper…",
+      "block": 15
+    },
+    {
+      "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/24/Podcasting-wcwc.jpg/500px-Podcasting-wcwc.jpg?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail",
+      "caption": "Podcasting studio in What Cheer Writers Club in Providence, Rhode Island",
+      "context": "Production and listening … A podcast generator maintains a central list of the files on a server as a web feed that one can access through the Internet. The listener or viewer uses special client application software on a computer or media player, known as a podcast client, which accesses this web feed, checks it for…",
+      "block": 25
+    },
+    {
+      "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/af/2023022603_Elan_Connect_frontalseitlich_links_%282%29_2023.jpg/500px-2023022603_Elan_Connect_frontalseitlich_links_%282%29_2023.jpg?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail",
+      "alt": "Radio on a white surface.",
+      "caption": "Web/DAB+/FM/podcast radio from Pure",
+      "context": "Hardware … The most basic equipment for a podcast is a computer and a microphone. It is helpful to have a sound-proof room and headphones. The computer should have a recording or streaming application installed. Typical microphones for podcasting are connected using USB. If the podcast involves two or more…",
+      "block": 45
+    },
+    {
+      "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/99/Wiktionary-logo-en-v2.svg/120px-Wiktionary-logo-en-v2.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail",
+      "alt": "Wiktionary logo",
+      "context": "This audio file is based on a version from this article dated 30 October 2024, and does not reflect subsequent edits. … Look up podcast in Wiktionary, the free dictionary.",
+      "block": 58
+    }
+  ]
+}

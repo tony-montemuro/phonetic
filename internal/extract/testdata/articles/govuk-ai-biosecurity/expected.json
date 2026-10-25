@@ -1,0 +1,113 @@
+{
+  "title": "Introducing the AI Biosecurity Lab",
+  "byline": "Cabinet Office",
+  "site_name": "GOV.UK",
+  "language": "en",
+  "excerpt": "Backed by up to £300mn of government funding and company commitments, the AI Biosecurity Lab will use AI to strengthen UK resilience to biological threats.",
+  "lead_image": "https://assets.publishing.service.gov.uk/media/5a37da9d40f0b649cfaf7b27/s960_cabinet-office.jpg",
+  "published_at": "2026-10-23T23:01:00Z",
+  "blocks": [
+    {
+      "kind": "paragraph",
+      "text": "Advances in AI are creating unprecedented opportunities for scientific discovery, but they are also changing the biological risk landscape. AI can accelerate research, improve our understanding of diseases, and support the discovery and development of new medical countermeasures. However, increasingly capable AI systems also create new biological risks and could lower barriers to harmful activity."
+    },
+    {
+      "kind": "paragraph",
+      "text": "The UK is committed to harnessing the benefits of AI while strengthening resilience to biological threats. That’s why, as part of a National AI Biosecurity Initiative, the government is establishing the AI Biosecurity Lab (AIBL)."
+    },
+    {
+      "kind": "paragraph",
+      "text": "The AI Biosecurity Lab will be the world’s first dedicated AI biosecurity organisation. Backed by £100 million of government funding, and up to £200 million in company commitments from OpenAI and Anthropic, it will develop technical capabilities that help the UK better understand, prevent, detect and respond to biological threats, building on the UK’s broader Biological Security Strategy."
+    },
+    {
+      "kind": "paragraph",
+      "text": "AIBL will harness frontier AI to support partners, including the UK’s national biosecurity centres and world leading life sciences industry, to detect biological threats earlier and accelerate the discovery, development and testing of vaccines, treatments and other medical countermeasures, enabling the UK and the world to respond faster to disease outbreaks and strengthening resilience against future biological risks."
+    },
+    {
+      "kind": "heading",
+      "text": "Mission and scope"
+    },
+    {
+      "kind": "paragraph",
+      "text": "The AI Biosecurity Lab mission will be to strengthen our biosecurity by harnessing frontier AI. It will bring together frontier AI and biological science talent to develop practical technical capabilities that improve the UK’s ability to understand, prevent, detect and respond to biological threats."
+    },
+    {
+      "kind": "paragraph",
+      "text": "AIBL’s cutting-edge research will strengthen UK and global resilience to a wide range of biological risks, including those enabled by advances in AI."
+    },
+    {
+      "kind": "paragraph",
+      "text": "Initial delivery will focus on developing and deploying capabilities that:"
+    },
+    {
+      "kind": "list_item",
+      "text": "Enhance early detection of emerging biological threats"
+    },
+    {
+      "kind": "list_item",
+      "text": "Accelerate the development of vaccines, treatments and other medical countermeasures"
+    },
+    {
+      "kind": "heading",
+      "text": "Partnerships"
+    },
+    {
+      "kind": "paragraph",
+      "text": "Partnerships will be central to AIBL’s approach. The AI Biosecurity Lab will work with public-sector organisations, academic institutions, industry partners and frontier AI companies in the UK and internationally."
+    },
+    {
+      "kind": "paragraph",
+      "text": "AIBL will bring together expertise across biosecurity, life sciences and AI, building deep research collaborations that help translate advances in AI into practical capabilities that strengthen resilience to biological threats."
+    },
+    {
+      "kind": "paragraph",
+      "text": "The Government intends for AIBL to be supported by both public and philanthropic funding, enabling additional investment to be channelled towards strengthening biosecurity capabilities over time."
+    },
+    {
+      "kind": "paragraph",
+      "text": "AIBL will launch with up to £200 million committed from two of the leading frontier AI companies:"
+    },
+    {
+      "kind": "list_item",
+      "text": "OpenAI will provide £100 million in compute and model credits and trusted access to its most capable relevant models through the Rosalind Biodefense programme."
+    },
+    {
+      "kind": "list_item",
+      "text": "Anthropic will provide up to £100 million in model credits, trusted model access and dedicated technical support."
+    },
+    {
+      "kind": "paragraph",
+      "text": "AIBL will also partner with Google DeepMind and pioneering UK AI life sciences company Basecamp Research on research collaborations and AI for science tools"
+    },
+    {
+      "kind": "list_item",
+      "text": "Basecamp Research will provide access to its AI-biology models, capabilities, and technical expertise to tackle priority biosecurity challenges."
+    },
+    {
+      "kind": "list_item",
+      "text": "Google DeepMind scientists and biosecurity experts will partner with AIBL on research collaborations, and will look to provide trusted access to frontier Gemini and specialised science models."
+    },
+    {
+      "kind": "heading",
+      "text": "Organisational structure"
+    },
+    {
+      "kind": "paragraph",
+      "text": "AIBL will operate as an independent, non-profit organisation and is designed to establish the UK as the world-leader in AI-enabled biosecurity. Similar to the AI Security Institute, it will attract leading industry and academic technical talent and operate with sufficient autonomy to move with the speed and focus of a frontier AI–bio company."
+    },
+    {
+      "kind": "paragraph",
+      "text": "AIBL will be supported by a scientific advisory committee drawing on expertise from academia, industry and the third sector. Further details on the scientific advisory committee will be set out in due course."
+    },
+    {
+      "kind": "paragraph",
+      "text": "Given that biosecurity is at the heart of AIBL’s mission, it will maintain strong and trusted partnerships with government agencies. AIBL is being launched as part of a National AI Biosecurity Initiative, bringing together the UK Health Security Agency (UKHSA), the Animal and Plant Health Agency (APHA) and the Defence Science and Technology Laboratory (Dstl) with the AI Biosecurity Lab and the Life Sciences sector."
+    },
+    {
+      "kind": "paragraph",
+      "text": "AIBL will also work with the Medicines and Healthcare products Regulatory Agency (MHRA) to prepare for health emergencies and inform the regulation of AI-designed medicines."
+    }
+  ],
+  "word_count": 694,
+  "images": []
+}

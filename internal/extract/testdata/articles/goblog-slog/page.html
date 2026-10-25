@@ -1,0 +1,1609 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="auto">
+<head>
+
+<link rel="preconnect" href="https://www.googletagmanager.com">
+<script >(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-W8MVQXG');</script>
+  
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#00add8">
+<link rel="canonical" href="https://go.dev/blog/slog">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Material+Icons">
+<link rel="stylesheet" href="/css/styles.css">
+<link rel="icon" href="/images/favicon-gopher.png" sizes="any">
+<link rel="apple-touch-icon" href="/images/favicon-gopher-plain.png"/>
+<link rel="icon" href="/images/favicon-gopher.svg" type="image/svg+xml">
+<link rel="me" href="https://hachyderm.io/@golang">
+
+<link rel="alternate" title="The Go Blog" type="application/atom+xml" href="/blog/feed.atom">
+
+  
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-W8MVQXG');</script>
+  
+<script src="/js/site.js"></script>
+<meta name="og:url" content="https://go.dev/blog/slog">
+<meta name="og:title" content="Structured Logging with slog - The Go Programming Language">
+<title>Structured Logging with slog - The Go Programming Language</title>
+
+<meta name="og:description" content="The Go 1.21 standard library includes a new structured logging package, log/slog.">
+<meta name="description" content="The Go 1.21 standard library includes a new structured logging package, log/slog.">
+
+<meta name="og:image" content="https://go.dev/doc/gopher/gopher5logo.jpg">
+<meta name="twitter:image" content="https://go.dev/doc/gopher/runningsquare.jpg">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:site" content="@golang">
+</head>
+<body class="Site">
+  
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-W8MVQXG"
+  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  
+
+
+
+<section class="SurveyBanner js-surveyBanner" role="region" aria-label="2026 Go Developer Survey" data-survey-id="go-survey-2026">
+  <img class="SurveyBanner-gopher" src="/images/gophers/gopher-announcement.png" width="108" height="80" alt="" aria-hidden="true">
+  <img class="SurveyBanner-bullhornMobile" src="/images/icons/bullhorn-mobile.svg" width="22" height="23" alt="" aria-hidden="true">
+  <img class="SurveyBanner-bullhornDesktop" src="/images/icons/bullhorn-desktop.svg" width="28" height="28" alt="" aria-hidden="true">
+  <div class="SurveyBanner-content">
+    <span class="SurveyBanner-lead">Help us shape the future of Go!</span>
+    <a class="SurveyBanner-link js-surveyBannerLink" href="https://blink.qualtrics.com/jfe/form/SV_ba8fa1ZcSQQdTRs?s=g" target="_blank" rel="noopener"><span class="SurveyBanner-linkPrefix">Take the </span>2026 Go Developer Survey</a>
+  </div>
+  <button class="SurveyBanner-close js-surveyBannerClose" type="button" aria-label="Minimize the survey banner">
+    <img class="SurveyBanner-minimizeIcon" src="/images/icons/minimize.svg" width="20" height="20" alt="" aria-hidden="true">
+  </button>
+</section>
+
+<header class="Site-header js-siteHeader">
+  <div class="Header Header--dark">
+    <nav class="Header-nav">
+      <a href="/">
+        <img
+          class="js-headerLogo Header-logo"
+          src="/images/go-logo-white.svg"
+          alt="Go">
+      </a>
+      <div class="skip-navigation-wrapper">
+        <a class="skip-to-content-link" aria-label="Skip to main content" href="#main-content"> Skip to Main Content </a>
+      </div>
+      <div class="Header-rightContent">
+        <ul class="Header-menu">
+          <li class="Header-menuItem ">
+            <a href="#"  class="js-desktop-menu-hover" aria-label=Why&#32;Go aria-describedby="dropdown-description">
+              Why Go <i class="material-icons" aria-hidden="true">arrow_drop_down</i>
+            </a>
+            <div class="screen-reader-only" id="dropdown-description" hidden>
+              Press Enter to activate/deactivate dropdown
+            </div>
+              <ul class="Header-submenu js-desktop-submenu-hover" aria-label="submenu">
+                  <li class="Header-submenuItem">
+                    <div>
+                        <a href="/solutions/case-studies">
+                          Case Studies
+                          
+                        </a>
+                    </div>
+                    <p>Common problems companies solve with Go</p>
+                  </li>
+                  <li class="Header-submenuItem">
+                    <div>
+                        <a href="/solutions/use-cases">
+                          Use Cases
+                          
+                        </a>
+                    </div>
+                    <p>Stories about how and why companies use Go</p>
+                  </li>
+                  <li class="Header-submenuItem">
+                    <div>
+                        <a href="/security/">
+                          Security
+                          
+                        </a>
+                    </div>
+                    <p>How Go can help keep you secure by default</p>
+                  </li>
+              </ul>
+          </li>
+          <li class="Header-menuItem ">
+            <a href="/learn/"  aria-label=Learn aria-describedby="dropdown-description">
+              Learn 
+            </a>
+            <div class="screen-reader-only" id="dropdown-description" hidden>
+              Press Enter to activate/deactivate dropdown
+            </div>
+          </li>
+          <li class="Header-menuItem ">
+            <a href="#"  class="js-desktop-menu-hover" aria-label=Docs aria-describedby="dropdown-description">
+              Docs <i class="material-icons" aria-hidden="true">arrow_drop_down</i>
+            </a>
+            <div class="screen-reader-only" id="dropdown-description" hidden>
+              Press Enter to activate/deactivate dropdown
+            </div>
+              <ul class="Header-submenu js-desktop-submenu-hover" aria-label="submenu">
+                  <li class="Header-submenuItem">
+                    <div>
+                        <a href="/ref/spec">
+                          Go Spec
+                          
+                        </a>
+                    </div>
+                    <p>The official Go language specification</p>
+                  </li>
+                  <li class="Header-submenuItem">
+                    <div>
+                        <a href="/doc">
+                          Go User Manual
+                          
+                        </a>
+                    </div>
+                    <p>A complete introduction to building software with Go</p>
+                  </li>
+                  <li class="Header-submenuItem">
+                    <div>
+                        <a href="https://pkg.go.dev/std">
+                          Standard library
+                          
+                        </a>
+                    </div>
+                    <p>Reference documentation for Go&#39;s standard library</p>
+                  </li>
+                  <li class="Header-submenuItem">
+                    <div>
+                        <a href="/doc/devel/release">
+                          Release Notes
+                          
+                        </a>
+                    </div>
+                    <p>Learn what&#39;s new in each Go release</p>
+                  </li>
+                  <li class="Header-submenuItem">
+                    <div>
+                        <a href="/doc/effective_go">
+                          Effective Go
+                          
+                        </a>
+                    </div>
+                    <p>Tips for writing clear, performant, and idiomatic Go code</p>
+                  </li>
+              </ul>
+          </li>
+          <li class="Header-menuItem ">
+            <a href="https://pkg.go.dev"  aria-label=Packages aria-describedby="dropdown-description">
+              Packages 
+            </a>
+            <div class="screen-reader-only" id="dropdown-description" hidden>
+              Press Enter to activate/deactivate dropdown
+            </div>
+          </li>
+          <li class="Header-menuItem ">
+            <a href="#"  class="js-desktop-menu-hover" aria-label=Community aria-describedby="dropdown-description">
+              Community <i class="material-icons" aria-hidden="true">arrow_drop_down</i>
+            </a>
+            <div class="screen-reader-only" id="dropdown-description" hidden>
+              Press Enter to activate/deactivate dropdown
+            </div>
+              <ul class="Header-submenu js-desktop-submenu-hover" aria-label="submenu">
+                  <li class="Header-submenuItem">
+                    <div>
+                        <a href="/talks/">
+                          Recorded Talks
+                          
+                        </a>
+                    </div>
+                    <p>Videos from prior events</p>
+                  </li>
+                  <li class="Header-submenuItem">
+                    <div>
+                        <a href="https://www.meetup.com/pro/go">
+                          Meetups
+                           <i class="material-icons">open_in_new</i>
+                        </a>
+                    </div>
+                    <p>Meet other local Go developers</p>
+                  </li>
+                  <li class="Header-submenuItem">
+                    <div>
+                        <a href="/wiki/Conferences">
+                          Conferences
+                           <i class="material-icons">open_in_new</i>
+                        </a>
+                    </div>
+                    <p>Learn and network with Go developers from around the world</p>
+                  </li>
+                  <li class="Header-submenuItem">
+                    <div>
+                        <a href="/blog">
+                          Go blog
+                          
+                        </a>
+                    </div>
+                    <p>The Go project&#39;s official blog.</p>
+                  </li>
+                  <li class="Header-submenuItem">
+                    <div>
+                        <a href="/help">
+                          Go project
+                          
+                        </a>
+                    </div>
+                    <p>Get help and stay informed from Go</p>
+                  </li>
+                  <li class="Header-submenuItem">
+                    <div>
+                        Get connected
+                    </div>
+                    <p></p>
+                      <div class="Header-socialIcons">
+                        
+                        <a class="Header-socialIcon" aria-label="Get connected with google-groups (Opens in new window)" href="https://groups.google.com/g/golang-nuts"><img src="/images/logos/social/google-groups.svg" /></a>
+                        <a class="Header-socialIcon" aria-label="Get connected with github (Opens in new window)" href="https://github.com/golang"><img src="/images/logos/social/github.svg" /></a>
+                        <a class="Header-socialIcon" aria-label="Get connected with bluesky (Opens in new window)" href="https://bsky.app/profile/golang.org"><img src="/images/logos/social/bluesky.svg" /></a>
+                        <a class="Header-socialIcon" aria-label="Get connected with mastodon (Opens in new window)" href="https://hachyderm.io/@golang"><img src="/images/logos/social/mastodon.svg" /></a>
+                        <a class="Header-socialIcon" aria-label="Get connected with twitter (Opens in new window)" href="https://twitter.com/golang"><img src="/images/logos/social/twitter.svg" /></a>
+                        <a class="Header-socialIcon" aria-label="Get connected with reddit (Opens in new window)" href="https://www.reddit.com/r/golang/"><img src="/images/logos/social/reddit.svg" /></a>
+                        <a class="Header-socialIcon" aria-label="Get connected with slack (Opens in new window)" href="https://invite.slack.golangbridge.org/"><img src="/images/logos/social/slack.svg" /></a>
+                        <a class="Header-socialIcon" aria-label="Get connected with stack-overflow (Opens in new window)" href="https://stackoverflow.com/tags/go"><img src="/images/logos/social/stack-overflow.svg" /></a>
+                      </div>
+                  </li>
+              </ul>
+          </li>
+        </ul>
+        <button class="Header-navOpen js-headerMenuButton Header-navOpen--white" aria-label="Open navigation.">
+        </button>
+      </div>
+    </nav>
+    
+  </div>
+</header>
+<aside class="NavigationDrawer js-header">
+  <nav class="NavigationDrawer-nav">
+    <div class="NavigationDrawer-header">
+      <a href="/">
+        <img class="NavigationDrawer-logo" src="/images/go-logo-blue.svg" alt="Go.">
+      </a>
+    </div>
+    <ul class="NavigationDrawer-list">
+        
+          <li class="NavigationDrawer-listItem js-mobile-subnav-trigger  NavigationDrawer-hasSubnav">
+            <a href="#"><span>Why Go</span> <i class="material-icons">navigate_next</i></a>
+
+            <div class="NavigationDrawer NavigationDrawer-submenuItem">
+              <nav class="NavigationDrawer-nav">
+                <div class="NavigationDrawer-header">
+                  <a href="#"><i class="material-icons">navigate_before</i>Why Go</a>
+                </div>
+                <ul class="NavigationDrawer-list">
+                    <li class="NavigationDrawer-listItem">
+                        <a href="/solutions/case-studies">
+                          Case Studies
+                          
+                        </a>
+                      
+                    </li>
+                    <li class="NavigationDrawer-listItem">
+                        <a href="/solutions/use-cases">
+                          Use Cases
+                          
+                        </a>
+                      
+                    </li>
+                    <li class="NavigationDrawer-listItem">
+                        <a href="/security/">
+                          Security
+                          
+                        </a>
+                      
+                    </li>
+                </ul>
+              </div>
+            </div>
+          </li>
+
+        
+        
+          <li class="NavigationDrawer-listItem ">
+            <a href="/learn/">Learn</a>
+          </li>
+        
+        
+          <li class="NavigationDrawer-listItem js-mobile-subnav-trigger  NavigationDrawer-hasSubnav">
+            <a href="#"><span>Docs</span> <i class="material-icons">navigate_next</i></a>
+
+            <div class="NavigationDrawer NavigationDrawer-submenuItem">
+              <nav class="NavigationDrawer-nav">
+                <div class="NavigationDrawer-header">
+                  <a href="#"><i class="material-icons">navigate_before</i>Docs</a>
+                </div>
+                <ul class="NavigationDrawer-list">
+                    <li class="NavigationDrawer-listItem">
+                        <a href="/ref/spec">
+                          Go Spec
+                          
+                        </a>
+                      
+                    </li>
+                    <li class="NavigationDrawer-listItem">
+                        <a href="/doc">
+                          Go User Manual
+                          
+                        </a>
+                      
+                    </li>
+                    <li class="NavigationDrawer-listItem">
+                        <a href="https://pkg.go.dev/std">
+                          Standard library
+                          
+                        </a>
+                      
+                    </li>
+                    <li class="NavigationDrawer-listItem">
+                        <a href="/doc/devel/release">
+                          Release Notes
+                          
+                        </a>
+                      
+                    </li>
+                    <li class="NavigationDrawer-listItem">
+                        <a href="/doc/effective_go">
+                          Effective Go
+                          
+                        </a>
+                      
+                    </li>
+                </ul>
+              </div>
+            </div>
+          </li>
+
+        
+        
+          <li class="NavigationDrawer-listItem ">
+            <a href="https://pkg.go.dev">Packages</a>
+          </li>
+        
+        
+          <li class="NavigationDrawer-listItem js-mobile-subnav-trigger  NavigationDrawer-hasSubnav">
+            <a href="#"><span>Community</span> <i class="material-icons">navigate_next</i></a>
+
+            <div class="NavigationDrawer NavigationDrawer-submenuItem">
+              <nav class="NavigationDrawer-nav">
+                <div class="NavigationDrawer-header">
+                  <a href="#"><i class="material-icons">navigate_before</i>Community</a>
+                </div>
+                <ul class="NavigationDrawer-list">
+                    <li class="NavigationDrawer-listItem">
+                        <a href="/talks/">
+                          Recorded Talks
+                          
+                        </a>
+                      
+                    </li>
+                    <li class="NavigationDrawer-listItem">
+                        <a href="https://www.meetup.com/pro/go">
+                          Meetups
+                           <i class="material-icons">open_in_new</i>
+                        </a>
+                      
+                    </li>
+                    <li class="NavigationDrawer-listItem">
+                        <a href="/wiki/Conferences">
+                          Conferences
+                           <i class="material-icons">open_in_new</i>
+                        </a>
+                      
+                    </li>
+                    <li class="NavigationDrawer-listItem">
+                        <a href="/blog">
+                          Go blog
+                          
+                        </a>
+                      
+                    </li>
+                    <li class="NavigationDrawer-listItem">
+                        <a href="/help">
+                          Go project
+                          
+                        </a>
+                      
+                    </li>
+                    <li class="NavigationDrawer-listItem">
+                        <div>Get connected</div>
+                        <div class="Header-socialIcons">
+                          
+                            <a class="Header-socialIcon" href="https://groups.google.com/g/golang-nuts"><img src="/images/logos/social/google-groups.svg" /></a>
+                            <a class="Header-socialIcon" href="https://github.com/golang"><img src="/images/logos/social/github.svg" /></a>
+                            <a class="Header-socialIcon" href="https://bsky.app/profile/golang.org"><img src="/images/logos/social/bluesky.svg" /></a>
+                            <a class="Header-socialIcon" href="https://hachyderm.io/@golang"><img src="/images/logos/social/mastodon.svg" /></a>
+                            <a class="Header-socialIcon" href="https://twitter.com/golang"><img src="/images/logos/social/twitter.svg" /></a>
+                            <a class="Header-socialIcon" href="https://www.reddit.com/r/golang/"><img src="/images/logos/social/reddit.svg" /></a>
+                            <a class="Header-socialIcon" href="https://invite.slack.golangbridge.org/"><img src="/images/logos/social/slack.svg" /></a>
+                            <a class="Header-socialIcon" href="https://stackoverflow.com/tags/go"><img src="/images/logos/social/stack-overflow.svg" /></a>
+                        </div>
+                    </li>
+                </ul>
+              </div>
+            </div>
+          </li>
+
+        
+    </ul>
+  </nav>
+</aside>
+<div class="NavigationDrawer-scrim js-scrim" role="presentation"></div>
+<main class="SiteContent SiteContent--default" id="main-content">
+  
+<div id="blog"><div id="content">
+  <div id="content">
+
+    <div class="Article" data-slug="/blog/slog">
+    
+    <h1 class="small"><a href="/blog/">The Go Blog</a></h1>
+    
+
+    <h1>Structured Logging with slog</h1>
+      
+      <p class="author">
+      Jonathan Amsterdam<br>
+      22 August 2023
+      </p>
+      
+      <div class='markdown'>
+<p>The new <code>log/slog</code> package in Go 1.21 brings structured logging to the standard
+library. Structured logs use key-value pairs so they can be parsed, filtered,
+searched, and analyzed quickly and reliably.
+For servers, logging is an important way for developers to
+observe the detailed behavior of the system, and often the first place they go
+to debug it. Logs therefore tend to be voluminous, and the ability to search and
+filter them quickly is essential.</p>
+<p>The standard library has had a logging package, <code>log</code>,
+since Go&rsquo;s initial release over a decade ago.
+Over time,
+we&rsquo;ve learned that structured logging is important to Go programmers. It has
+consistently ranked high in our annual survey, and many packages in the Go
+ecosystem provide it. Some of these are quite popular: one of the first structured
+logging packages for Go, <a href="https://pkg.go.dev/github.com/sirupsen/logrus" rel="noreferrer" target="_blank">logrus</a>,
+is used in over 100,000 other packages.</p>
+<p>With many structured logging packages to choose from, large programs
+will often end up including more than one through their dependencies. The main program
+might have to configure each of these logging packages so that the log output is
+consistent: it all goes to the same place, in the same format. By including
+structured logging in the standard library, we can provide a common framework
+that all the other structured logging packages can share.</p>
+<h2 id="a-tour-of-slog">A tour of <code>slog</code></h2>
+<p>Here is the simplest program that uses <code>slog</code>:</p>
+<pre><code class="language-go">package main
+
+import &quot;log/slog&quot;
+
+func main() {
+    slog.Info(&quot;hello, world&quot;)
+}
+</code></pre>
+<p>As of this writing, it prints:</p>
+<pre><code>2023/08/04 16:09:19 INFO hello, world
+</code></pre>
+<p>The <code>Info</code> function prints a message at the Info log level using the
+default logger, which in this case is the default logger from the <code>log</code>
+package&mdash;the same logger you get when you write <code>log.Printf</code>.
+That explains why the output looks so similar: only the &ldquo;INFO&rdquo; is new.
+Out of the box, <code>slog</code> and the original <code>log</code> package work together to make it
+easy to get started.</p>
+<p>Besides <code>Info</code>, there are functions for three other levels&mdash;<code>Debug</code>, <code>Warn</code>, and
+<code>Error</code>&mdash;as well as a more general <code>Log</code> function that takes the level as an
+argument. In <code>slog</code>, levels are just integers, so you aren&rsquo;t limited to the four
+named levels. For example, <code>Info</code> is zero and <code>Warn</code> is 4, so if your logging system
+has a level in between those, you can use 2 for it.</p>
+<p>Unlike with the <code>log</code> package, we can easily add key-value pairs to our output
+by writing them after the message:</p>
+<pre><code class="language-go">slog.Info(&quot;hello, world&quot;, &quot;user&quot;, os.Getenv(&quot;USER&quot;))
+</code></pre>
+<p>The output now looks like this:</p>
+<pre><code>2023/08/04 16:27:19 INFO hello, world user=jba
+</code></pre>
+<p>As we mentioned, <code>slog</code>&rsquo;s top-level functions use the default logger.
+We can get this logger explicitly, and call its methods:</p>
+<pre><code class="language-go">logger := slog.Default()
+logger.Info(&quot;hello, world&quot;, &quot;user&quot;, os.Getenv(&quot;USER&quot;))
+</code></pre>
+<p>Every top-level function corresponds to a method on a <code>slog.Logger</code>.
+The output is the same as before.</p>
+<p>Initially, slog&rsquo;s output goes through the default <code>log.Logger</code>, producing the
+output we&rsquo;ve seen above.
+We can change the output by changing the <em>handler</em> used by the logger.
+<code>slog</code> comes with two built-in handlers.
+A <code>TextHandler</code> emits all log information in the form <code>key=value</code>.
+This program creates a new logger using a <code>TextHandler</code> and
+makes the same call to the <code>Info</code> method:</p>
+<pre><code class="language-go">logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+logger.Info(&quot;hello, world&quot;, &quot;user&quot;, os.Getenv(&quot;USER&quot;))
+</code></pre>
+<p>Now the output looks like this:</p>
+<pre><code>time=2023-08-04T16:56:03.786-04:00 level=INFO msg=&quot;hello, world&quot; user=jba
+</code></pre>
+<p>Everything has been turned into a key-value pair, with strings quoted as needed to preserve structure.</p>
+<p>For JSON output, install the built-in <code>JSONHandler</code> instead:</p>
+<pre><code class="language-go">logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+logger.Info(&quot;hello, world&quot;, &quot;user&quot;, os.Getenv(&quot;USER&quot;))
+</code></pre>
+<p>Now our output is a sequence of JSON objects, one per logging call:</p>
+<pre><code>{&quot;time&quot;:&quot;2023-08-04T16:58:02.939245411-04:00&quot;,&quot;level&quot;:&quot;INFO&quot;,&quot;msg&quot;:&quot;hello, world&quot;,&quot;user&quot;:&quot;jba&quot;}
+</code></pre>
+<p>You are not limited to the built-in handlers. Anyone can write a handler by
+implementing the <code>slog.Handler</code> interface. A handler can generate output in a
+particular format, or it can wrap another handler to add functionality.
+One of the
+<a href="https://pkg.go.dev/log/slog@master#example-Handler-LevelHandler" rel="noreferrer" target="_blank">examples</a> in
+the <code>slog</code> documentation shows how to write a wrapping handler that changes the minimum
+level at which log messages will be displayed.</p>
+<p>The alternating key-value syntax for attributes that we&rsquo;ve been using so far is convenient, but for frequently executed log statements it may be more efficient to use the <code>Attr</code> type and call the <code>LogAttrs</code> method.
+These work together to minimize memory allocations.
+There are functions for building <code>Attr</code>s out of strings, numbers, and other common
+types. This call to <code>LogAttrs</code> produces the same output as above, but does it faster:</p>
+<pre><code class="language-go">slog.LogAttrs(context.Background(), slog.LevelInfo, &quot;hello, world&quot;,
+    slog.String(&quot;user&quot;, os.Getenv(&quot;USER&quot;)))
+</code></pre>
+<p>There is a lot more to <code>slog</code>:</p>
+<ul>
+<li>
+<p>As the call to <code>LogAttrs</code> shows, you can pass a <code>context.Context</code> to some log functions
+so a handler can extract context information like trace IDs. (Canceling the context does not prevent the log entry from being written.)</p>
+</li>
+<li>
+<p>You can call <code>Logger.With</code> to add attributes to a logger that will appear in
+all of its output, effectively factoring out the common parts of several log
+statements. This is not only convenient, but it can also help performance, as discussed below.</p>
+</li>
+<li>
+<p>Attributes can be combined into groups. This can add more structure to your
+log output and can help to disambiguate keys that would otherwise be identical.</p>
+</li>
+<li>
+<p>You can control how a value appears in the logs by providing its type with a <code>LogValue</code>
+method. That can be used to <a href="https://pkg.go.dev/log/slog@master#example-LogValuer-Group" rel="noreferrer" target="_blank">log the fields of a struct as a
+group</a> or <a href="https://pkg.go.dev/log/slog@master#example-LogValuer-Secret" rel="noreferrer" target="_blank">redact
+sensitive data</a>,
+among other things.</p>
+</li>
+</ul>
+<p>The best place to learn about all of <code>slog</code> is the <a href="https://pkg.go.dev/log/slog" rel="noreferrer" target="_blank">package
+documentation</a>.</p>
+<h2 id="performance">Performance</h2>
+<p>We wanted <code>slog</code> to be fast.
+For large-scale performance gains, we designed <a href="https://pkg.go.dev/log/slog#Handler" rel="noreferrer" target="_blank">the <code>Handler</code>
+interface</a> to provide optimization
+opportunities. The <code>Enabled</code> method is called at the beginning of every log
+event, giving the handler a chance to drop unwanted log events quickly. The
+<code>WithAttrs</code> and <code>WithGroup</code> methods let the handler format
+attributes added by <code>Logger.With</code> once, rather than at each logging call. This
+pre-formatting can provide a significant speedup when large attributes, like an
+<code>http.Request</code>, are added to a <code>Logger</code> and then used in many logging calls.</p>
+<p>To inform our performance optimization work, we investigated typical patterns of logging in existing open-source projects. We found that over 95%
+of calls to logging methods pass five or fewer attributes. We also categorized
+the types of attributes, finding that a handful of common types accounted for
+the majority.
+We then wrote benchmarks that captured the common cases, and used them as a
+guide to see where the time went.
+The greatest gains came from paying careful attention to memory allocation.</p>
+<h2 id="the-design-process">The design process</h2>
+<p>The <code>slog</code> package is one of the largest additions to the standard library since
+Go 1 was released in 2012. We wanted to take our time designing it, and we knew
+that community feedback would be essential.</p>
+<p>By April 2022, we had gathered enough data to demonstrate the importance of
+structured logging to the Go community. The Go team decided to explore adding it
+to the standard library.</p>
+<p>We began by looking at how the existing structured logging packages were
+designed. We also took advantage of the large collection of open-source Go code
+stored on the Go module proxy to learn how these packages were actually used.
+Our first design was informed by this research as well as Go&rsquo;s spirit of
+simplicity.
+We wanted an API that is light on the page and easy to understand, without
+sacrificing performance.</p>
+<p>It was never a goal to replace existing third-party logging packages.
+They are all good at what they do, and replacing existing code that works well
+is rarely a good use of a developer&rsquo;s time.
+We divided the API into a frontend, <code>Logger</code>, that calls a backend interface, <code>Handler</code>.
+That way, existing logging packages can talk to a common backend,
+so the packages that use them can interoperate without having to be rewritten.
+Handlers are written or in progress for many common logging
+packages, including
+<a href="https://github.com/uber-go/zap/tree/master/exp/zapslog" rel="noreferrer" target="_blank">Zap</a>,
+<a href="https://github.com/go-logr/logr/pull/196" rel="noreferrer" target="_blank">logr</a>
+and <a href="https://github.com/evanphx/go-hclog-slog" rel="noreferrer" target="_blank">hclog</a>.</p>
+<p>We shared our initial design within the Go team and other developers who had
+extensive logging experience. We made alterations based on their feedback, and
+by August of 2022 we felt we had a workable design. On August 29,
+we made our <a href="https://github.com/golang/exp/tree/master/slog" rel="noreferrer" target="_blank">experimental
+implementation</a> public
+and began a <a href="https://github.com/golang/go/discussions/54763" rel="noreferrer" target="_blank">GitHub discussion</a> to hear
+what the community had to say.
+The response was enthusiastic and largely positive.
+Thanks to insightful comments from the designers and users of other structured
+logging packages, we made several changes and added a few features, like groups
+and the <code>LogValuer</code> interface. We changed the mapping from log levels to
+integers twice.</p>
+<p>After two months and about 300 comments, we felt we were ready for an actual
+<a href="/issue/56345">proposal</a> and accompanying <a href="https://go.googlesource.com/proposal/+/03441cb358c7b27a8443bca839e5d7a314677ea6/design/56345-structured-logging.md" rel="noreferrer" target="_blank">design
+doc</a>.
+The proposal issue garnered over 800 comments and resulted in many improvements to
+the API and the implementation. Here are two examples of API changes, both
+concerning <code>context.Context</code>:</p>
+<ol>
+<li>
+<p>Originally the API supported adding loggers to a
+context. Many felt that this was a convenient way to plumb a logger easily
+through levels of code that didn&rsquo;t care about it. But others felt it was
+smuggling in  an implicit dependency, making the code harder to understand.
+Ultimately, we removed the feature as being too controversial.</p>
+</li>
+<li>
+<p>We also wrestled
+with the related question of passing a context to logging methods, trying a
+number of designs. We initially resisted the standard pattern of passing the
+context as the first argument because we didn&rsquo;t want every logging call to
+require a context, but ultimately created two sets of logging methods, one
+with a context and one without.</p>
+</li>
+</ol>
+<p>One change we did not make concerned the alternating key-and-value syntax for
+expressing attributes:</p>
+<pre><code class="language-go">slog.Info(&quot;message&quot;, &quot;k1&quot;, v1, &quot;k2&quot;, v2)
+</code></pre>
+<p>Many felt strongly that this was a bad idea. They found it hard to read
+and easy to get wrong by omitting a key or value. They preferred explicit
+attributes for expressing structure:</p>
+<pre><code class="language-go">slog.Info(&quot;message&quot;, slog.Int(&quot;k1&quot;, v1), slog.String(&quot;k2&quot;, v2))
+</code></pre>
+<p>But we felt that the lighter syntax was important to keeping Go easy and fun to
+use, especially for new Go programmers. We also knew that several Go logging
+packages, like <code>logr</code>, <code>go-kit/log</code> and <code>zap</code> (with its <code>SugaredLogger</code>)
+successfully used alternating keys and
+values. We added a <a href="https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/slog" rel="noreferrer" target="_blank">vet
+check</a>
+to catch common mistakes, but did not change the design.</p>
+<p>On March 15, 2023, the proposal was accepted, but there were still some minor
+unresolved issues. Over the next few weeks, ten additional changes were proposed
+and resolved. By early July, the <code>log/slog</code> package implementation was complete,
+along with the <code>testing/slogtest</code> package for verifying
+handlers and the vet check for correct usage of alternating keys and values.</p>
+<p>And on August 8, Go 1.21 was released, and <code>slog</code> with it.
+We hope you find it useful, and as fun to use as it was to build.</p>
+<p>And a big thanks to everyone who participated in the discussion and the proposal
+process. Your contributions improved <code>slog</code> immensely.</p>
+<h2 id="resources">Resources</h2>
+<p>The <a href="https://pkg.go.dev/log/slog" rel="noreferrer" target="_blank">documentation</a> for the <code>log/slog</code> package
+explains how to use it and provides several examples.</p>
+<p>The <a href="/wiki/Resources-for-slog">wiki page</a> has
+additional resources provided by the Go community, including a variety of
+handlers.</p>
+<p>If you want to write a handler, consult the
+<a href="https://github.com/golang/example/blob/master/slog-handler-guide/README.md" rel="noreferrer" target="_blank">handler writing
+guide</a>.</p>
+</div>
+
+    </div>
+
+    
+    <div class="Article prevnext">
+    
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+        <p>
+        
+          
+            <b>Next article: </b><a href="/blog/rebuild">Perfectly Reproducible, Verified Go Toolchains</a><br>
+          
+        
+        
+          
+            <b>Previous article: </b><a href="/blog/toolchain">Forward Compatibility and Toolchain Management in Go 1.21</a><br>
+          
+        
+        <b><a href="/blog/all">Blog Index</a></b>
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+    </div>
+    
+
+  </div>
+</div>
+
+<script src="/js/play.js"></script>
+
+</main>
+<footer class="Site-footer">
+  <div class="Footer">
+    <div class="Container">
+      <div class="Footer-links">
+          <div class="Footer-linkColumn">
+            <a href="/solutions/" class="Footer-link Footer-link--primary" aria-describedby="footer-description">
+              Why Go
+            </a>
+              <a href="/solutions/use-cases" class="Footer-link" aria-describedby="footer-description">
+                Use Cases
+              </a>
+              <a href="/solutions/case-studies" class="Footer-link" aria-describedby="footer-description">
+                Case Studies
+              </a>
+          </div>
+          <div class="Footer-linkColumn">
+            <a href="/learn/" class="Footer-link Footer-link--primary" aria-describedby="footer-description">
+              Get Started
+            </a>
+              <a href="/play" class="Footer-link" aria-describedby="footer-description">
+                Playground
+              </a>
+              <a href="/tour/" class="Footer-link" aria-describedby="footer-description">
+                Tour
+              </a>
+              <a href="https://stackoverflow.com/questions/tagged/go?tab=Newest" class="Footer-link" aria-describedby="footer-description">
+                Stack Overflow
+              </a>
+              <a href="/help/" class="Footer-link" aria-describedby="footer-description">
+                Help
+              </a>
+          </div>
+          <div class="Footer-linkColumn">
+            <a href="https://pkg.go.dev" class="Footer-link Footer-link--primary" aria-describedby="footer-description">
+              Packages
+            </a>
+              <a href="/pkg/" class="Footer-link" aria-describedby="footer-description">
+                Standard Library
+              </a>
+              <a href="https://pkg.go.dev/about" class="Footer-link" aria-describedby="footer-description">
+                About Go Packages
+              </a>
+              <a href="https://pkg.go.dev/api" class="Footer-link" aria-describedby="footer-description">
+                pkg.go.dev API
+              </a>
+          </div>
+          <div class="Footer-linkColumn">
+            <a href="/project" class="Footer-link Footer-link--primary" aria-describedby="footer-description">
+              About
+            </a>
+              <a href="/dl/" class="Footer-link" aria-describedby="footer-description">
+                Download
+              </a>
+              <a href="/blog/" class="Footer-link" aria-describedby="footer-description">
+                Blog
+              </a>
+              <a href="https://github.com/golang/go/issues" class="Footer-link" aria-describedby="footer-description">
+                Issue Tracker
+              </a>
+              <a href="/doc/devel/release" class="Footer-link" aria-describedby="footer-description">
+                Release Notes
+              </a>
+              <a href="/brand" class="Footer-link" aria-describedby="footer-description">
+                Brand Guidelines
+              </a>
+              <a href="/conduct" class="Footer-link" aria-describedby="footer-description">
+                Code of Conduct
+              </a>
+          </div>
+          <div class="Footer-linkColumn">
+            <a href="/wiki/#the-go-community" class="Footer-link Footer-link--primary" aria-describedby="footer-description">
+              Connect
+            </a>
+              <a href="https://bsky.app/profile/golang.org" class="Footer-link" aria-describedby="footer-description">
+                Bluesky
+              </a>
+              <a href="https://hachyderm.io/@golang" class="Footer-link" aria-describedby="footer-description">
+                Mastodon
+              </a>
+              <a href="https://www.twitter.com/golang" class="Footer-link" aria-describedby="footer-description">
+                Twitter
+              </a>
+              <a href="https://github.com/golang" class="Footer-link" aria-describedby="footer-description">
+                GitHub
+              </a>
+              <a href="https://invite.slack.golangbridge.org/" class="Footer-link" aria-describedby="footer-description">
+                Slack
+              </a>
+              <a href="https://reddit.com/r/golang" class="Footer-link" aria-describedby="footer-description">
+                r/golang
+              </a>
+              <a href="https://www.meetup.com/pro/go" class="Footer-link" aria-describedby="footer-description">
+                Meetup
+              </a>
+              <a href="https://golangweekly.com/" class="Footer-link" aria-describedby="footer-description">
+                Golang Weekly
+              </a>
+          </div>
+      </div>
+    </div>
+  </div>
+  <div class="screen-reader-only" id="footer-description" hidden>
+          Opens in new window.
+  </div>
+  <div class="Footer">
+    <div class="Container Container--fullBleed">
+      <div class="Footer-bottom">
+        <img class="Footer-gopher" src="/images/gophers/pilot-bust.svg" alt="The Go Gopher">
+        <ul class="Footer-listRow">
+          <li class="Footer-listItem">
+            <a href="/copyright" aria-describedby="footer-description">Copyright</a>
+          </li>
+          <li class="Footer-listItem">
+            <a href="/tos" aria-describedby="footer-description">Terms of Service</a>
+          </li>
+          <li class="Footer-listItem">
+            <a href="http://www.google.com/intl/en/policies/privacy/" aria-describedby="footer-description"
+              target="_blank"
+              rel="noopener">
+              Privacy Policy
+            </a>
+            </li>
+          <li class="Footer-listItem">
+            <a
+              href="/s/website-issue" aria-describedby="footer-description"
+              target="_blank"
+              rel="noopener"
+              >
+              Report an Issue
+            </a>
+          </li>
+          <li class="Footer-listItem go-Footer-listItem">
+            <button class="go-Button go-Button--text go-Footer-toggleTheme js-toggleTheme" aria-label="Toggle theme">
+              <img
+                data-value="auto"
+                class="go-Icon go-Icon--inverted"
+                height="24"
+                width="24"
+                src="/images/icons/brightness_6_gm_grey_24dp.svg"
+                alt="System theme">
+              <img
+                data-value="dark"
+                class="go-Icon go-Icon--inverted"
+                height="24"
+                width="24"
+                src="/images/icons/brightness_2_gm_grey_24dp.svg"
+                alt="Dark theme">
+              <img
+                data-value="light"
+                class="go-Icon go-Icon--inverted"
+                height="24"
+                width="24"
+                src="/images/icons/light_mode_gm_grey_24dp.svg"
+                alt="Light theme">
+            </button>
+          </li>
+        </ul>
+        <a class="Footer-googleLogo" target="_blank" href="https://google.com" rel="noopener">
+          <img class="Footer-googleLogoImg" src="/images/google-white.png" alt="Google logo">
+        </a>
+      </div>
+    </div>
+  </div>
+  <script src="/js/jquery.js"></script>
+  <script src="/js/carousels.js"></script>
+  <script src="/js/searchBox.js"></script>
+  <script src="/js/misc.js"></script>
+  <script src="/js/hats.js"></script>
+  <script src="/js/playground.js"></script>
+  <script src="/js/godocs.js"></script>
+  <script async src="/js/copypaste.js"></script>
+</footer>
+<section class="Cookie-notice js-cookieNotice">
+  <div>go.dev uses cookies from Google to deliver and enhance the quality of its services and to
+  analyze traffic. <a target=_blank href="https://policies.google.com/technologies/cookies">Learn more.</a></div>
+  <div><button class="go-Button">Okay</button></div>
+</section>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

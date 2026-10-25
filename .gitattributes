@@ -1,0 +1,3 @@
+# Extraction fixtures must stay byte-for-byte as captured (no line-ending or
+# whitespace normalization).
+internal/extract/testdata/** -text -whitespace

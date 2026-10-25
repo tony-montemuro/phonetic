@@ -1,0 +1,2006 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="auto">
+<head>
+
+<link rel="preconnect" href="https://www.googletagmanager.com">
+<script >(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-W8MVQXG');</script>
+  
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#00add8">
+<link rel="canonical" href="https://go.dev/blog/pipelines">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Material+Icons">
+<link rel="stylesheet" href="/css/styles.css">
+<link rel="icon" href="/images/favicon-gopher.png" sizes="any">
+<link rel="apple-touch-icon" href="/images/favicon-gopher-plain.png"/>
+<link rel="icon" href="/images/favicon-gopher.svg" type="image/svg+xml">
+<link rel="me" href="https://hachyderm.io/@golang">
+
+<link rel="alternate" title="The Go Blog" type="application/atom+xml" href="/blog/feed.atom">
+
+  
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-W8MVQXG');</script>
+  
+<script src="/js/site.js"></script>
+<meta name="og:url" content="https://go.dev/blog/pipelines">
+<meta name="og:title" content="Go Concurrency Patterns: Pipelines and cancellation - The Go Programming Language">
+<title>Go Concurrency Patterns: Pipelines and cancellation - The Go Programming Language</title>
+
+<meta name="og:description" content="How to use Go&#39;s concurrency to build data-processing pipelines.">
+<meta name="description" content="How to use Go&#39;s concurrency to build data-processing pipelines.">
+
+<meta name="og:image" content="https://go.dev/doc/gopher/gopher5logo.jpg">
+<meta name="twitter:image" content="https://go.dev/doc/gopher/runningsquare.jpg">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:site" content="@golang">
+</head>
+<body class="Site">
+  
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-W8MVQXG"
+  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  
+
+
+
+<section class="SurveyBanner js-surveyBanner" role="region" aria-label="2026 Go Developer Survey" data-survey-id="go-survey-2026">
+  <img class="SurveyBanner-gopher" src="/images/gophers/gopher-announcement.png" width="108" height="80" alt="" aria-hidden="true">
+  <img class="SurveyBanner-bullhornMobile" src="/images/icons/bullhorn-mobile.svg" width="22" height="23" alt="" aria-hidden="true">
+  <img class="SurveyBanner-bullhornDesktop" src="/images/icons/bullhorn-desktop.svg" width="28" height="28" alt="" aria-hidden="true">
+  <div class="SurveyBanner-content">
+    <span class="SurveyBanner-lead">Help us shape the future of Go!</span>
+    <a class="SurveyBanner-link js-surveyBannerLink" href="https://blink.qualtrics.com/jfe/form/SV_ba8fa1ZcSQQdTRs?s=g" target="_blank" rel="noopener"><span class="SurveyBanner-linkPrefix">Take the </span>2026 Go Developer Survey</a>
+  </div>
+  <button class="SurveyBanner-close js-surveyBannerClose" type="button" aria-label="Minimize the survey banner">
+    <img class="SurveyBanner-minimizeIcon" src="/images/icons/minimize.svg" width="20" height="20" alt="" aria-hidden="true">
+  </button>
+</section>
+
+<header class="Site-header js-siteHeader">
+  <div class="Header Header--dark">
+    <nav class="Header-nav">
+      <a href="/">
+        <img
+          class="js-headerLogo Header-logo"
+          src="/images/go-logo-white.svg"
+          alt="Go">
+      </a>
+      <div class="skip-navigation-wrapper">
+        <a class="skip-to-content-link" aria-label="Skip to main content" href="#main-content"> Skip to Main Content </a>
+      </div>
+      <div class="Header-rightContent">
+        <ul class="Header-menu">
+          <li class="Header-menuItem ">
+            <a href="#"  class="js-desktop-menu-hover" aria-label=Why&#32;Go aria-describedby="dropdown-description">
+              Why Go <i class="material-icons" aria-hidden="true">arrow_drop_down</i>
+            </a>
+            <div class="screen-reader-only" id="dropdown-description" hidden>
+              Press Enter to activate/deactivate dropdown
+            </div>
+              <ul class="Header-submenu js-desktop-submenu-hover" aria-label="submenu">
+                  <li class="Header-submenuItem">
+                    <div>
+                        <a href="/solutions/case-studies">
+                          Case Studies
+                          
+                        </a>
+                    </div>
+                    <p>Common problems companies solve with Go</p>
+                  </li>
+                  <li class="Header-submenuItem">
+                    <div>
+                        <a href="/solutions/use-cases">
+                          Use Cases
+                          
+                        </a>
+                    </div>
+                    <p>Stories about how and why companies use Go</p>
+                  </li>
+                  <li class="Header-submenuItem">
+                    <div>
+                        <a href="/security/">
+                          Security
+                          
+                        </a>
+                    </div>
+                    <p>How Go can help keep you secure by default</p>
+                  </li>
+              </ul>
+          </li>
+          <li class="Header-menuItem ">
+            <a href="/learn/"  aria-label=Learn aria-describedby="dropdown-description">
+              Learn 
+            </a>
+            <div class="screen-reader-only" id="dropdown-description" hidden>
+              Press Enter to activate/deactivate dropdown
+            </div>
+          </li>
+          <li class="Header-menuItem ">
+            <a href="#"  class="js-desktop-menu-hover" aria-label=Docs aria-describedby="dropdown-description">
+              Docs <i class="material-icons" aria-hidden="true">arrow_drop_down</i>
+            </a>
+            <div class="screen-reader-only" id="dropdown-description" hidden>
+              Press Enter to activate/deactivate dropdown
+            </div>
+              <ul class="Header-submenu js-desktop-submenu-hover" aria-label="submenu">
+                  <li class="Header-submenuItem">
+                    <div>
+                        <a href="/ref/spec">
+                          Go Spec
+                          
+                        </a>
+                    </div>
+                    <p>The official Go language specification</p>
+                  </li>
+                  <li class="Header-submenuItem">
+                    <div>
+                        <a href="/doc">
+                          Go User Manual
+                          
+                        </a>
+                    </div>
+                    <p>A complete introduction to building software with Go</p>
+                  </li>
+                  <li class="Header-submenuItem">
+                    <div>
+                        <a href="https://pkg.go.dev/std">
+                          Standard library
+                          
+                        </a>
+                    </div>
+                    <p>Reference documentation for Go&#39;s standard library</p>
+                  </li>
+                  <li class="Header-submenuItem">
+                    <div>
+                        <a href="/doc/devel/release">
+                          Release Notes
+                          
+                        </a>
+                    </div>
+                    <p>Learn what&#39;s new in each Go release</p>
+                  </li>
+                  <li class="Header-submenuItem">
+                    <div>
+                        <a href="/doc/effective_go">
+                          Effective Go
+                          
+                        </a>
+                    </div>
+                    <p>Tips for writing clear, performant, and idiomatic Go code</p>
+                  </li>
+              </ul>
+          </li>
+          <li class="Header-menuItem ">
+            <a href="https://pkg.go.dev"  aria-label=Packages aria-describedby="dropdown-description">
+              Packages 
+            </a>
+            <div class="screen-reader-only" id="dropdown-description" hidden>
+              Press Enter to activate/deactivate dropdown
+            </div>
+          </li>
+          <li class="Header-menuItem ">
+            <a href="#"  class="js-desktop-menu-hover" aria-label=Community aria-describedby="dropdown-description">
+              Community <i class="material-icons" aria-hidden="true">arrow_drop_down</i>
+            </a>
+            <div class="screen-reader-only" id="dropdown-description" hidden>
+              Press Enter to activate/deactivate dropdown
+            </div>
+              <ul class="Header-submenu js-desktop-submenu-hover" aria-label="submenu">
+                  <li class="Header-submenuItem">
+                    <div>
+                        <a href="/talks/">
+                          Recorded Talks
+                          
+                        </a>
+                    </div>
+                    <p>Videos from prior events</p>
+                  </li>
+                  <li class="Header-submenuItem">
+                    <div>
+                        <a href="https://www.meetup.com/pro/go">
+                          Meetups
+                           <i class="material-icons">open_in_new</i>
+                        </a>
+                    </div>
+                    <p>Meet other local Go developers</p>
+                  </li>
+                  <li class="Header-submenuItem">
+                    <div>
+                        <a href="/wiki/Conferences">
+                          Conferences
+                           <i class="material-icons">open_in_new</i>
+                        </a>
+                    </div>
+                    <p>Learn and network with Go developers from around the world</p>
+                  </li>
+                  <li class="Header-submenuItem">
+                    <div>
+                        <a href="/blog">
+                          Go blog
+                          
+                        </a>
+                    </div>
+                    <p>The Go project&#39;s official blog.</p>
+                  </li>
+                  <li class="Header-submenuItem">
+                    <div>
+                        <a href="/help">
+                          Go project
+                          
+                        </a>
+                    </div>
+                    <p>Get help and stay informed from Go</p>
+                  </li>
+                  <li class="Header-submenuItem">
+                    <div>
+                        Get connected
+                    </div>
+                    <p></p>
+                      <div class="Header-socialIcons">
+                        
+                        <a class="Header-socialIcon" aria-label="Get connected with google-groups (Opens in new window)" href="https://groups.google.com/g/golang-nuts"><img src="/images/logos/social/google-groups.svg" /></a>
+                        <a class="Header-socialIcon" aria-label="Get connected with github (Opens in new window)" href="https://github.com/golang"><img src="/images/logos/social/github.svg" /></a>
+                        <a class="Header-socialIcon" aria-label="Get connected with bluesky (Opens in new window)" href="https://bsky.app/profile/golang.org"><img src="/images/logos/social/bluesky.svg" /></a>
+                        <a class="Header-socialIcon" aria-label="Get connected with mastodon (Opens in new window)" href="https://hachyderm.io/@golang"><img src="/images/logos/social/mastodon.svg" /></a>
+                        <a class="Header-socialIcon" aria-label="Get connected with twitter (Opens in new window)" href="https://twitter.com/golang"><img src="/images/logos/social/twitter.svg" /></a>
+                        <a class="Header-socialIcon" aria-label="Get connected with reddit (Opens in new window)" href="https://www.reddit.com/r/golang/"><img src="/images/logos/social/reddit.svg" /></a>
+                        <a class="Header-socialIcon" aria-label="Get connected with slack (Opens in new window)" href="https://invite.slack.golangbridge.org/"><img src="/images/logos/social/slack.svg" /></a>
+                        <a class="Header-socialIcon" aria-label="Get connected with stack-overflow (Opens in new window)" href="https://stackoverflow.com/tags/go"><img src="/images/logos/social/stack-overflow.svg" /></a>
+                      </div>
+                  </li>
+              </ul>
+          </li>
+        </ul>
+        <button class="Header-navOpen js-headerMenuButton Header-navOpen--white" aria-label="Open navigation.">
+        </button>
+      </div>
+    </nav>
+    
+  </div>
+</header>
+<aside class="NavigationDrawer js-header">
+  <nav class="NavigationDrawer-nav">
+    <div class="NavigationDrawer-header">
+      <a href="/">
+        <img class="NavigationDrawer-logo" src="/images/go-logo-blue.svg" alt="Go.">
+      </a>
+    </div>
+    <ul class="NavigationDrawer-list">
+        
+          <li class="NavigationDrawer-listItem js-mobile-subnav-trigger  NavigationDrawer-hasSubnav">
+            <a href="#"><span>Why Go</span> <i class="material-icons">navigate_next</i></a>
+
+            <div class="NavigationDrawer NavigationDrawer-submenuItem">
+              <nav class="NavigationDrawer-nav">
+                <div class="NavigationDrawer-header">
+                  <a href="#"><i class="material-icons">navigate_before</i>Why Go</a>
+                </div>
+                <ul class="NavigationDrawer-list">
+                    <li class="NavigationDrawer-listItem">
+                        <a href="/solutions/case-studies">
+                          Case Studies
+                          
+                        </a>
+                      
+                    </li>
+                    <li class="NavigationDrawer-listItem">
+                        <a href="/solutions/use-cases">
+                          Use Cases
+                          
+                        </a>
+                      
+                    </li>
+                    <li class="NavigationDrawer-listItem">
+                        <a href="/security/">
+                          Security
+                          
+                        </a>
+                      
+                    </li>
+                </ul>
+              </div>
+            </div>
+          </li>
+
+        
+        
+          <li class="NavigationDrawer-listItem ">
+            <a href="/learn/">Learn</a>
+          </li>
+        
+        
+          <li class="NavigationDrawer-listItem js-mobile-subnav-trigger  NavigationDrawer-hasSubnav">
+            <a href="#"><span>Docs</span> <i class="material-icons">navigate_next</i></a>
+
+            <div class="NavigationDrawer NavigationDrawer-submenuItem">
+              <nav class="NavigationDrawer-nav">
+                <div class="NavigationDrawer-header">
+                  <a href="#"><i class="material-icons">navigate_before</i>Docs</a>
+                </div>
+                <ul class="NavigationDrawer-list">
+                    <li class="NavigationDrawer-listItem">
+                        <a href="/ref/spec">
+                          Go Spec
+                          
+                        </a>
+                      
+                    </li>
+                    <li class="NavigationDrawer-listItem">
+                        <a href="/doc">
+                          Go User Manual
+                          
+                        </a>
+                      
+                    </li>
+                    <li class="NavigationDrawer-listItem">
+                        <a href="https://pkg.go.dev/std">
+                          Standard library
+                          
+                        </a>
+                      
+                    </li>
+                    <li class="NavigationDrawer-listItem">
+                        <a href="/doc/devel/release">
+                          Release Notes
+                          
+                        </a>
+                      
+                    </li>
+                    <li class="NavigationDrawer-listItem">
+                        <a href="/doc/effective_go">
+                          Effective Go
+                          
+                        </a>
+                      
+                    </li>
+                </ul>
+              </div>
+            </div>
+          </li>
+
+        
+        
+          <li class="NavigationDrawer-listItem ">
+            <a href="https://pkg.go.dev">Packages</a>
+          </li>
+        
+        
+          <li class="NavigationDrawer-listItem js-mobile-subnav-trigger  NavigationDrawer-hasSubnav">
+            <a href="#"><span>Community</span> <i class="material-icons">navigate_next</i></a>
+
+            <div class="NavigationDrawer NavigationDrawer-submenuItem">
+              <nav class="NavigationDrawer-nav">
+                <div class="NavigationDrawer-header">
+                  <a href="#"><i class="material-icons">navigate_before</i>Community</a>
+                </div>
+                <ul class="NavigationDrawer-list">
+                    <li class="NavigationDrawer-listItem">
+                        <a href="/talks/">
+                          Recorded Talks
+                          
+                        </a>
+                      
+                    </li>
+                    <li class="NavigationDrawer-listItem">
+                        <a href="https://www.meetup.com/pro/go">
+                          Meetups
+                           <i class="material-icons">open_in_new</i>
+                        </a>
+                      
+                    </li>
+                    <li class="NavigationDrawer-listItem">
+                        <a href="/wiki/Conferences">
+                          Conferences
+                           <i class="material-icons">open_in_new</i>
+                        </a>
+                      
+                    </li>
+                    <li class="NavigationDrawer-listItem">
+                        <a href="/blog">
+                          Go blog
+                          
+                        </a>
+                      
+                    </li>
+                    <li class="NavigationDrawer-listItem">
+                        <a href="/help">
+                          Go project
+                          
+                        </a>
+                      
+                    </li>
+                    <li class="NavigationDrawer-listItem">
+                        <div>Get connected</div>
+                        <div class="Header-socialIcons">
+                          
+                            <a class="Header-socialIcon" href="https://groups.google.com/g/golang-nuts"><img src="/images/logos/social/google-groups.svg" /></a>
+                            <a class="Header-socialIcon" href="https://github.com/golang"><img src="/images/logos/social/github.svg" /></a>
+                            <a class="Header-socialIcon" href="https://bsky.app/profile/golang.org"><img src="/images/logos/social/bluesky.svg" /></a>
+                            <a class="Header-socialIcon" href="https://hachyderm.io/@golang"><img src="/images/logos/social/mastodon.svg" /></a>
+                            <a class="Header-socialIcon" href="https://twitter.com/golang"><img src="/images/logos/social/twitter.svg" /></a>
+                            <a class="Header-socialIcon" href="https://www.reddit.com/r/golang/"><img src="/images/logos/social/reddit.svg" /></a>
+                            <a class="Header-socialIcon" href="https://invite.slack.golangbridge.org/"><img src="/images/logos/social/slack.svg" /></a>
+                            <a class="Header-socialIcon" href="https://stackoverflow.com/tags/go"><img src="/images/logos/social/stack-overflow.svg" /></a>
+                        </div>
+                    </li>
+                </ul>
+              </div>
+            </div>
+          </li>
+
+        
+    </ul>
+  </nav>
+</aside>
+<div class="NavigationDrawer-scrim js-scrim" role="presentation"></div>
+<main class="SiteContent SiteContent--default" id="main-content">
+  
+<div id="blog"><div id="content">
+  <div id="content">
+
+    <div class="Article" data-slug="/blog/pipelines">
+    
+    <h1 class="small"><a href="/blog/">The Go Blog</a></h1>
+    
+
+    <h1>Go Concurrency Patterns: Pipelines and cancellation</h1>
+      
+      <p class="author">
+      Sameer Ajmani<br>
+      13 March 2014
+      </p>
+      
+      <div class='markdown'>
+<h2 id="introduction">Introduction</h2>
+<p>Go&rsquo;s concurrency primitives make it easy to construct streaming data pipelines
+that make efficient use of I/O and multiple CPUs.  This article presents
+examples of such pipelines, highlights subtleties that arise when operations
+fail, and introduces techniques for dealing with failures cleanly.</p>
+<h2 id="what-is-a-pipeline">What is a pipeline?</h2>
+<p>There&rsquo;s no formal definition of a pipeline in Go; it&rsquo;s just one of many kinds of
+concurrent programs.  Informally, a pipeline is a series of <em>stages</em> connected
+by channels, where each stage is a group of goroutines running the same
+function.  In each stage, the goroutines</p>
+<ul>
+<li>receive values from <em>upstream</em> via <em>inbound</em> channels</li>
+<li>perform some function on that data, usually producing new values</li>
+<li>send values <em>downstream</em> via <em>outbound</em> channels</li>
+</ul>
+<p>Each stage has any number of inbound and outbound channels, except the
+first and last stages, which have only outbound or inbound channels,
+respectively.  The first stage is sometimes called the <em>source</em> or
+<em>producer</em>; the last stage, the <em>sink</em> or <em>consumer</em>.</p>
+<p>We&rsquo;ll begin with a simple example pipeline to explain the ideas and techniques.
+Later, we&rsquo;ll present a more realistic example.</p>
+<h2 id="squaring-numbers">Squaring numbers</h2>
+<p>Consider a pipeline with three stages.</p>
+<p>The first stage, <code>gen</code>, is a function that converts a list of integers to a
+channel that emits the integers in the list.  The <code>gen</code> function starts a
+goroutine that sends the integers on the channel and closes the channel when all
+the values have been sent:</p>
+<div class="code">
+<pre>func gen(nums ...int) &lt;-chan int {
+    out := make(chan int)
+    go func() {
+        for _, n := range nums {
+            out &lt;- n
+        }
+        close(out)
+    }()
+    return out
+}
+</pre>
+</div>
+<p>The second stage, <code>sq</code>, receives integers from a channel and returns a
+channel that emits the square of each received integer.  After the
+inbound channel is closed and this stage has sent all the values
+downstream, it closes the outbound channel:</p>
+<div class="code">
+<pre>func sq(in &lt;-chan int) &lt;-chan int {
+    out := make(chan int)
+    go func() {
+        for n := range in {
+            out &lt;- n * n
+        }
+        close(out)
+    }()
+    return out
+}
+</pre>
+</div>
+<p>The <code>main</code> function sets up the pipeline and runs the final stage: it receives
+values from the second stage and prints each one, until the channel is closed:</p>
+<div class="code">
+<pre>func main() {
+    <span class="comment">// Set up the pipeline.</span>
+    c := gen(2, 3)
+    out := sq(c)
+
+    <span class="comment">// Consume the output.</span>
+    fmt.Println(&lt;-out) <span class="comment">// 4</span>
+    fmt.Println(&lt;-out) <span class="comment">// 9</span>
+}
+</pre>
+</div>
+<p>Since <code>sq</code> has the same type for its inbound and outbound channels, we
+can compose it any number of times.  We can also rewrite <code>main</code> as a
+range loop, like the other stages:</p>
+<div class="code">
+<pre>func main() {
+    <span class="comment">// Set up the pipeline and consume the output.</span>
+    for n := range sq(sq(gen(2, 3))) {
+        fmt.Println(n) <span class="comment">// 16 then 81</span>
+    }
+}
+</pre>
+</div>
+<h2 id="fan-out-fan-in">Fan-out, fan-in</h2>
+<p>Multiple functions can read from the same channel until that channel is closed;
+this is called <em>fan-out</em>. This provides a way to distribute work amongst a group
+of workers to parallelize CPU use and I/O.</p>
+<p>A function can read from multiple inputs and proceed until all are closed by
+multiplexing the input channels onto a single channel that&rsquo;s closed when all the
+inputs are closed.  This is called <em>fan-in</em>.</p>
+<p>We can change our pipeline to run two instances of <code>sq</code>, each reading from the
+same input channel.  We introduce a new function, <em>merge</em>, to fan in the
+results:</p>
+<div class="code">
+<pre>func main() {
+    in := gen(2, 3)
+
+    <span class="comment">// Distribute the sq work across two goroutines that both read from in.</span>
+    c1 := sq(in)
+    c2 := sq(in)
+
+    <span class="comment">// Consume the merged output from c1 and c2.</span>
+    for n := range merge(c1, c2) {
+        fmt.Println(n) <span class="comment">// 4 then 9, or 9 then 4</span>
+    }
+}
+</pre>
+</div>
+<p>The <code>merge</code> function converts a list of channels to a single channel by starting
+a goroutine for each inbound channel that copies the values to the sole outbound
+channel.  Once all the <code>output</code> goroutines have been started, <code>merge</code> starts one
+more goroutine to close the outbound channel after all sends on that channel are
+done.</p>
+<p>Sends on a closed channel panic, so it&rsquo;s important to ensure all sends
+are done before calling close.  The
+<a href="/pkg/sync/#WaitGroup"><code>sync.WaitGroup</code></a> type
+provides a simple way to arrange this synchronization:</p>
+<div class="code">
+<pre>func merge(cs ...&lt;-chan int) &lt;-chan int {
+    <span class="highlight">var wg sync.WaitGroup</span>
+    out := make(chan int)
+
+    <span class="comment">// Start an output goroutine for each input channel in cs.  output</span>
+    <span class="comment">// copies values from c to out until c is closed, then calls wg.Done.</span>
+    output := func(c &lt;-chan int) {
+        for n := range c {
+            out &lt;- n
+        }
+        <span class="highlight">wg.Done()</span>
+    }
+    <span class="highlight">wg.Add(len(cs))</span>
+    for _, c := range cs {
+        go output(c)
+    }
+
+    <span class="comment">// Start a goroutine to close out once all the output goroutines are</span>
+    <span class="comment">// done.  This must start after the wg.Add call.</span>
+    go func() {
+        <span class="highlight">wg.Wait()</span>
+        close(out)
+    }()
+    return out
+}
+</pre>
+</div>
+<h2 id="stopping-short">Stopping short</h2>
+<p>There is a pattern to our pipeline functions:</p>
+<ul>
+<li>stages close their outbound channels when all the send operations are done.</li>
+<li>stages keep receiving values from inbound channels until those channels are closed.</li>
+</ul>
+<p>This pattern allows each receiving stage to be written as a <code>range</code> loop and
+ensures that all goroutines exit once all values have been successfully sent
+downstream.</p>
+<p>But in real pipelines, stages don&rsquo;t always receive all the inbound
+values.  Sometimes this is by design: the receiver may only need a
+subset of values to make progress.  More often, a stage exits early
+because an inbound value represents an error in an earlier stage. In
+either case the receiver should not have to wait for the remaining
+values to arrive, and we want earlier stages to stop producing values
+that later stages don&rsquo;t need.</p>
+<p>In our example pipeline, if a stage fails to consume all the inbound values, the
+goroutines attempting to send those values will block indefinitely:</p>
+<div class="code">
+<pre>    <span class="comment">// Consume the first value from the output.</span>
+    out := merge(c1, c2)
+    fmt.Println(&lt;-out) <span class="comment">// 4 or 9</span>
+    return
+    <span class="comment">// Since we didn&#39;t receive the second value from out,</span>
+    <span class="comment">// one of the output goroutines is hung attempting to send it.</span>
+}
+</pre>
+</div>
+<p>This is a resource leak: goroutines consume memory and runtime resources, and
+heap references in goroutine stacks keep data from being garbage collected.
+Goroutines are not garbage collected; they must exit on their own.</p>
+<p>We need to arrange for the upstream stages of our pipeline to exit even when the
+downstream stages fail to receive all the inbound values.  One way to do this is
+to change the outbound channels to have a buffer.  A buffer can hold a fixed
+number of values; send operations complete immediately if there&rsquo;s room in the
+buffer:</p>
+<pre><code class="language-go">c := make(chan int, 2) // buffer size 2
+c &lt;- 1  // succeeds immediately
+c &lt;- 2  // succeeds immediately
+c &lt;- 3  // blocks until another goroutine does &lt;-c and receives 1
+</code></pre>
+<p>When the number of values to be sent is known at channel creation time, a buffer
+can simplify the code.  For example, we can rewrite <code>gen</code> to copy the list of
+integers into a buffered channel and avoid creating a new goroutine:</p>
+<div class="code">
+<pre>func gen(nums ...int) &lt;-chan int {
+    out := make(chan int, len(nums))
+    for _, n := range nums {
+        out &lt;- n
+    }
+    close(out)
+    return out
+}
+</pre>
+</div>
+<p>Returning to the blocked goroutines in our pipeline, we might consider adding a
+buffer to the outbound channel returned by <code>merge</code>:</p>
+<div class="code">
+<pre>func merge(cs ...&lt;-chan int) &lt;-chan int {
+    var wg sync.WaitGroup
+    out := make(chan int, 1) <span class="comment">// enough space for the unread inputs</span>
+    <span class="comment">// ... the rest is unchanged ...</span>
+</pre>
+</div>
+<p>While this fixes the blocked goroutine in this program, this is bad code.  The
+choice of buffer size of 1 here depends on knowing the number of values <code>merge</code>
+will receive and the number of values downstream stages will consume.  This is
+fragile: if we pass an additional value to <code>gen</code>, or if the downstream stage
+reads any fewer values, we will again have blocked goroutines.</p>
+<p>Instead, we need to provide a way for downstream stages to indicate to the
+senders that they will stop accepting input.</p>
+<h2 id="explicit-cancellation">Explicit cancellation</h2>
+<p>When <code>main</code> decides to exit without receiving all the values from
+<code>out</code>, it must tell the goroutines in the upstream stages to abandon
+the values they&rsquo;re trying to send.  It does so by sending values on a
+channel called <code>done</code>.  It sends two values since there are
+potentially two blocked senders:</p>
+<div class="code">
+<pre>func main() {
+    in := gen(2, 3, 5)
+
+    <span class="comment">// Distribute the sq work across two goroutines that both read from in.</span>
+    c1 := sq(in)
+    c2 := sq(in)
+
+    <span class="comment">// Consume the first value from output.</span>
+    <span class="highlight">done := make(chan struct{}, 2)</span>
+    out := merge(done, c1, c2)
+    fmt.Println(&lt;-out) <span class="comment">// 4, 9, or 25</span>
+
+    <span class="comment">// Tell the remaining senders we&#39;re leaving.</span>
+    <span class="highlight">done &lt;- struct{}{}</span>
+    <span class="highlight">done &lt;- struct{}{}</span>
+}
+</pre>
+</div>
+<p>The sending goroutines replace their send operation with a <code>select</code> statement
+that proceeds either when the send on <code>out</code> happens or when they receive a value
+from <code>done</code>.  The value type of <code>done</code> is the empty struct because the value
+doesn&rsquo;t matter: it is the receive event that indicates the send on <code>out</code> should
+be abandoned.  The <code>output</code> goroutines continue looping on their inbound
+channel, <code>c</code>, so the upstream stages are not blocked. (We&rsquo;ll discuss in a moment
+how to allow this loop to return early.)</p>
+<div class="code">
+<pre>func merge(done &lt;-chan struct{}, cs ...&lt;-chan int) &lt;-chan int {
+    var wg sync.WaitGroup
+    out := make(chan int)
+
+    <span class="comment">// Start an output goroutine for each input channel in cs.  output</span>
+    <span class="comment">// copies values from c to out until c is closed or it receives a value</span>
+    <span class="comment">// from done, then output calls wg.Done.</span>
+    output := func(c &lt;-chan int) {
+    loop:
+        for n := range c {
+            select {
+            case out &lt;- n:
+            <span class="highlight">case &lt;-done:</span>
+                <span class="highlight">break loop</span>
+            }
+        }
+        wg.Done()
+    }
+    <span class="comment">// ... the rest is unchanged ...</span>
+</pre>
+</div>
+<p>This approach has a problem: <em>each</em> downstream receiver needs to know the number
+of potentially blocked upstream senders and arrange to signal those senders on
+early return.  Keeping track of these counts is tedious and error-prone.</p>
+<p>We need a way to tell an unknown and unbounded number of goroutines to
+stop sending their values downstream.  In Go, we can do this by
+closing a channel, because
+<a href="/ref/spec#Receive_operator">a receive operation on a closed channel can always proceed immediately, yielding the element type&rsquo;s zero value.</a></p>
+<p>This means that <code>main</code> can unblock all the senders simply by closing
+the <code>done</code> channel.  This close is effectively a broadcast signal to
+the senders.  We extend <em>each</em> of our pipeline functions to accept
+<code>done</code> as a parameter and arrange for the close to happen via a
+<code>defer</code> statement, so that all return paths from <code>main</code> will signal
+the pipeline stages to exit.</p>
+<div class="code">
+<pre>func main() {
+    <span class="comment">// Set up a done channel that&#39;s shared by the whole pipeline,</span>
+    <span class="comment">// and close that channel when this pipeline exits, as a signal</span>
+    <span class="comment">// for all the goroutines we started to exit.</span>
+    <span class="highlight">done := make(chan struct{})</span>
+    <span class="highlight">defer close(done)          </span>
+
+    in := gen(done, 2, 3)
+
+    <span class="comment">// Distribute the sq work across two goroutines that both read from in.</span>
+    c1 := sq(done, in)
+    c2 := sq(done, in)
+
+    <span class="comment">// Consume the first value from output.</span>
+    out := merge(done, c1, c2)
+    fmt.Println(&lt;-out) <span class="comment">// 4 or 9</span>
+
+    <span class="highlight-comment">// done will be closed by the deferred call.</span><span class="comment">      </span>
+}
+</pre>
+</div>
+<p>Each of our pipeline stages is now free to return as soon as <code>done</code> is closed.
+The <code>output</code> routine in <code>merge</code> can return without draining its inbound channel,
+since it knows the upstream sender, <code>sq</code>, will stop attempting to send when
+<code>done</code> is closed.  <code>output</code> ensures <code>wg.Done</code> is called on all return paths via
+a <code>defer</code> statement:</p>
+<div class="code">
+<pre>func merge(done &lt;-chan struct{}, cs ...&lt;-chan int) &lt;-chan int {
+    var wg sync.WaitGroup
+    out := make(chan int)
+
+    <span class="comment">// Start an output goroutine for each input channel in cs.  output</span>
+    <span class="comment">// copies values from c to out until c or done is closed, then calls</span>
+    <span class="comment">// wg.Done.</span>
+    output := func(c &lt;-chan int) {
+        <span class="highlight">defer wg.Done()</span>
+        for n := range c {
+            select {
+            case out &lt;- n:
+            case &lt;-done:
+                <span class="highlight">return</span>
+            }
+        }
+    }
+    <span class="comment">// ... the rest is unchanged ...</span>
+</pre>
+</div>
+<p>Similarly, <code>sq</code> can return as soon as <code>done</code> is closed.  <code>sq</code> ensures its <code>out</code>
+channel is closed on all return paths via a <code>defer</code> statement:</p>
+<div class="code">
+<pre>func sq(done &lt;-chan struct{}, in &lt;-chan int) &lt;-chan int {
+    out := make(chan int)
+    go func() {
+        <span class="highlight">defer close(out)</span>
+        for n := range in {
+            select {
+            case out &lt;- n * n:
+            case &lt;-done:
+                <span class="highlight">return</span>
+            }
+        }
+    }()
+    return out
+}
+</pre>
+</div>
+<p>Here are the guidelines for pipeline construction:</p>
+<ul>
+<li>stages close their outbound channels when all the send operations are done.</li>
+<li>stages keep receiving values from inbound channels until those channels are closed or the senders are unblocked.</li>
+</ul>
+<p>Pipelines unblock senders either by ensuring there&rsquo;s enough buffer for all the
+values that are sent or by explicitly signalling senders when the receiver may
+abandon the channel.</p>
+<h2 id="digesting-a-tree">Digesting a tree</h2>
+<p>Let&rsquo;s consider a more realistic pipeline.</p>
+<p>MD5 is a message-digest algorithm that&rsquo;s useful as a file checksum.  The command
+line utility <code>md5sum</code> prints digest values for a list of files.</p>
+<pre><code>% md5sum *.go
+d47c2bbc28298ca9befdfbc5d3aa4e65  bounded.go
+ee869afd31f83cbb2d10ee81b2b831dc  parallel.go
+b88175e65fdcbc01ac08aaf1fd9b5e96  serial.go
+</code></pre>
+<p>Our example program is like <code>md5sum</code> but instead takes a single directory as an
+argument and prints the digest values for each regular file under that
+directory, sorted by path name.</p>
+<pre><code>% go run serial.go .
+d47c2bbc28298ca9befdfbc5d3aa4e65  bounded.go
+ee869afd31f83cbb2d10ee81b2b831dc  parallel.go
+b88175e65fdcbc01ac08aaf1fd9b5e96  serial.go
+</code></pre>
+<p>The main function of our program invokes a helper function <code>MD5All</code>, which
+returns a map from path name to digest value, then sorts and prints the results:</p>
+<div class="code">
+<pre>func main() {
+    <span class="comment">// Calculate the MD5 sum of all files under the specified directory,</span>
+    <span class="comment">// then print the results sorted by path name.</span>
+    <span class="highlight">m, err := MD5All(os.Args[1])</span>
+    if err != nil {
+        fmt.Println(err)
+        return
+    }
+    var paths []string
+    for path := range m {
+        paths = append(paths, path)
+    }
+    <span class="highlight">sort.Strings(paths)</span>
+    for _, path := range paths {
+        fmt.Printf(&#34;%x  %s\n&#34;, m[path], path)
+    }
+}
+</pre>
+</div>
+<p>The <code>MD5All</code> function is the focus of our discussion.  In
+<a href="pipelines/serial.go">serial.go</a>, the implementation uses no concurrency and
+simply reads and sums each file as it walks the tree.</p>
+<div class="code">
+<pre><span class="comment">// MD5All reads all the files in the file tree rooted at root and returns a map</span>
+<span class="comment">// from file path to the MD5 sum of the file&#39;s contents.  If the directory walk</span>
+<span class="comment">// fails or any read operation fails, MD5All returns an error.</span>
+func MD5All(root string) (map[string][md5.Size]byte, error) {
+    m := make(map[string][md5.Size]byte)
+    <span class="highlight">err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {</span>
+        if err != nil {
+            return err
+        }
+        if !info.Mode().IsRegular() {
+            return nil
+        }
+        <span class="highlight">data, err := ioutil.ReadFile(path)</span>
+        if err != nil {
+            return err
+        }
+        <span class="highlight">m[path] = md5.Sum(data)</span>
+        return nil
+    })
+    if err != nil {
+        return nil, err
+    }
+    return m, nil
+}
+</pre>
+</div>
+<h2 id="parallel-digestion">Parallel digestion</h2>
+<p>In <a href="pipelines/parallel.go">parallel.go</a>, we split <code>MD5All</code> into a two-stage
+pipeline.  The first stage, <code>sumFiles</code>, walks the tree, digests each file in
+a new goroutine, and sends the results on a channel with value type <code>result</code>:</p>
+<div class="code">
+<pre>type result struct {
+    path string
+    sum  [md5.Size]byte
+    err  error
+}
+</pre>
+</div>
+<p><code>sumFiles</code> returns two channels: one for the <code>results</code> and another for the error
+returned by <code>filepath.Walk</code>.  The walk function starts a new goroutine to
+process each regular file, then checks <code>done</code>.  If <code>done</code> is closed, the walk
+stops immediately:</p>
+<div class="code">
+<pre>func sumFiles(done &lt;-chan struct{}, root string) (&lt;-chan result, &lt;-chan error) {
+    <span class="comment">// For each regular file, start a goroutine that sums the file and sends</span>
+    <span class="comment">// the result on c.  Send the result of the walk on errc.</span>
+    c := make(chan result)
+    errc := make(chan error, 1)
+    <span class="highlight">go func() {</span>
+        var wg sync.WaitGroup
+        err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+            if err != nil {
+                return err
+            }
+            if !info.Mode().IsRegular() {
+                return nil
+            }
+            wg.Add(1)
+            <span class="highlight">go func() {</span>
+                data, err := ioutil.ReadFile(path)
+                select {
+                <span class="highlight">case c &lt;- result{path, md5.Sum(data), err}:</span>
+                <span class="highlight">case &lt;-done:</span>
+                }
+                wg.Done()
+            }()
+            <span class="comment">// Abort the walk if done is closed.</span>
+            select {
+            <span class="highlight">case &lt;-done:</span>
+                return errors.New(&#34;walk canceled&#34;)
+            default:
+                return nil
+            }
+        })
+        <span class="comment">// Walk has returned, so all calls to wg.Add are done.  Start a</span>
+        <span class="comment">// goroutine to close c once all the sends are done.</span>
+        <span class="highlight">go func() {</span>
+            wg.Wait()
+            <span class="highlight">close(c)</span>
+        }()
+        <span class="comment">// No select needed here, since errc is buffered.</span>
+        <span class="highlight">errc &lt;- err</span>
+    }()
+    return c, errc
+}
+</pre>
+</div>
+<p><code>MD5All</code> receives the digest values from <code>c</code>.  <code>MD5All</code> returns early on error,
+closing <code>done</code> via a <code>defer</code>:</p>
+<div class="code">
+<pre>func MD5All(root string) (map[string][md5.Size]byte, error) {
+    <span class="comment">// MD5All closes the done channel when it returns; it may do so before</span>
+    <span class="comment">// receiving all the values from c and errc.</span>
+    <span class="highlight">done := make(chan struct{})</span>
+    <span class="highlight">defer close(done)          </span>
+
+    <span class="highlight">c, errc := sumFiles(done, root)</span>
+
+    m := make(map[string][md5.Size]byte)
+    for r := range c {
+        if r.err != nil {
+            return nil, r.err
+        }
+        m[r.path] = r.sum
+    }
+    if err := &lt;-errc; err != nil {
+        return nil, err
+    }
+    return m, nil
+}
+</pre>
+</div>
+<h2 id="bounded-parallelism">Bounded parallelism</h2>
+<p>The <code>MD5All</code> implementation in <a href="pipelines/parallel.go">parallel.go</a>
+starts a new goroutine for each file. In a directory with many large
+files, this may allocate more memory than is available on the machine.</p>
+<p>We can limit these allocations by bounding the number of files read in
+parallel.  In <a href="pipelines/bounded.go">bounded.go</a>, we do this by
+creating a fixed number of goroutines for reading files.  Our pipeline
+now has three stages: walk the tree, read and digest the files, and
+collect the digests.</p>
+<p>The first stage, <code>walkFiles</code>, emits the paths of regular files in the tree:</p>
+<div class="code">
+<pre>func walkFiles(done &lt;-chan struct{}, root string) (&lt;-chan string, &lt;-chan error) {
+    paths := make(chan string)
+    errc := make(chan error, 1)
+    <span class="highlight">go func() {</span>
+        <span class="comment">// Close the paths channel after Walk returns.</span>
+        <span class="highlight">defer close(paths)</span>
+        <span class="comment">// No select needed for this send, since errc is buffered.</span>
+        <span class="highlight">errc &lt;- filepath.Walk(root, func(path string, info os.FileInfo, err error) error {</span>
+            if err != nil {
+                return err
+            }
+            if !info.Mode().IsRegular() {
+                return nil
+            }
+            select {
+            <span class="highlight">case paths &lt;- path:</span>
+            <span class="highlight">case &lt;-done:</span>
+                return errors.New(&#34;walk canceled&#34;)
+            }
+            return nil
+        })
+    }()
+    return paths, errc
+}
+</pre>
+</div>
+<p>The middle stage starts a fixed number of <code>digester</code> goroutines that receive
+file names from <code>paths</code> and send <code>results</code> on channel <code>c</code>:</p>
+<div class="code">
+<pre>func digester(done &lt;-chan struct{}, paths &lt;-chan string, c chan&lt;- result) {
+    <span class="highlight">for path := range paths {</span>
+        data, err := ioutil.ReadFile(path)
+        select {
+        case c &lt;- result{path, md5.Sum(data), err}:
+        case &lt;-done:
+            return
+        }
+    }
+}
+</pre>
+</div>
+<p>Unlike our previous examples, <code>digester</code> does not close its output channel, as
+multiple goroutines are sending on a shared channel.  Instead, code in <code>MD5All</code>
+arranges for the channel to be closed when all the <code>digesters</code> are done:</p>
+<div class="code">
+<pre>    <span class="comment">// Start a fixed number of goroutines to read and digest files.</span>
+    <span class="highlight">c := make(chan result)</span>
+    var wg sync.WaitGroup
+    const numDigesters = 20
+    wg.Add(numDigesters)
+    for i := 0; i &lt; numDigesters; i++ {
+        go func() {
+            <span class="highlight">digester(done, paths, c)</span>
+            wg.Done()
+        }()
+    }
+    go func() {
+        wg.Wait()
+        <span class="highlight">close(c)</span>
+    }()
+</pre>
+</div>
+<p>We could instead have each digester create and return its own output
+channel, but then we would need additional goroutines to fan-in the
+results.</p>
+<p>The final stage receives all the <code>results</code> from <code>c</code> then checks the
+error from <code>errc</code>.  This check cannot happen any earlier, since before
+this point, <code>walkFiles</code> may block sending values downstream:</p>
+<div class="code">
+<pre>    m := make(map[string][md5.Size]byte)
+    for r := range c {
+        if r.err != nil {
+            return nil, r.err
+        }
+        m[r.path] = r.sum
+    }
+    <span class="comment">// Check whether the Walk failed.</span>
+    <span class="highlight">if err := &lt;-errc; err != nil {</span>
+        return nil, err
+    }
+    return m, nil
+}
+</pre>
+</div>
+<h2 id="conclusion">Conclusion</h2>
+<p>This article has presented techniques for constructing streaming data pipelines
+in Go.  Dealing with failures in such pipelines is tricky, since each stage in
+the pipeline may block attempting to send values downstream, and the downstream
+stages may no longer care about the incoming data.  We showed how closing a
+channel can broadcast a &ldquo;done&rdquo; signal to all the goroutines started by a
+pipeline and defined guidelines for constructing pipelines correctly.</p>
+<p>Further reading:</p>
+<ul>
+<li><a href="/talks/2012/concurrency.slide#1">Go Concurrency Patterns</a>
+(<a href="https://www.youtube.com/watch?v=f6kdp27TYZs" rel="noreferrer" target="_blank">video</a>) presents the basics
+of Go&rsquo;s concurrency primitives and several ways to apply them.</li>
+<li><a href="/blog/advanced-go-concurrency-patterns">Advanced Go Concurrency Patterns</a>
+(<a href="http://www.youtube.com/watch?v=QDDwwePbDtw" rel="noreferrer" target="_blank">video</a>) covers more complex
+uses of Go&rsquo;s primitives,
+especially <code>select</code>.</li>
+<li>Douglas McIlroy&rsquo;s paper <a href="https://swtch.com/~rsc/thread/squint.pdf" rel="noreferrer" target="_blank">Squinting at Power Series</a>
+shows how Go-like concurrency provides elegant support for complex calculations.</li>
+</ul>
+</div>
+
+    </div>
+
+    
+    <div class="Article prevnext">
+    
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+        <p>
+        
+          
+            <b>Next article: </b><a href="/blog/gopher">The Go Gopher</a><br>
+          
+        
+        
+          
+            <b>Previous article: </b><a href="/blog/fosdem14">Go talks at FOSDEM 2014</a><br>
+          
+        
+        <b><a href="/blog/all">Blog Index</a></b>
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+    </div>
+    
+
+  </div>
+</div>
+
+<script src="/js/play.js"></script>
+
+</main>
+<footer class="Site-footer">
+  <div class="Footer">
+    <div class="Container">
+      <div class="Footer-links">
+          <div class="Footer-linkColumn">
+            <a href="/solutions/" class="Footer-link Footer-link--primary" aria-describedby="footer-description">
+              Why Go
+            </a>
+              <a href="/solutions/use-cases" class="Footer-link" aria-describedby="footer-description">
+                Use Cases
+              </a>
+              <a href="/solutions/case-studies" class="Footer-link" aria-describedby="footer-description">
+                Case Studies
+              </a>
+          </div>
+          <div class="Footer-linkColumn">
+            <a href="/learn/" class="Footer-link Footer-link--primary" aria-describedby="footer-description">
+              Get Started
+            </a>
+              <a href="/play" class="Footer-link" aria-describedby="footer-description">
+                Playground
+              </a>
+              <a href="/tour/" class="Footer-link" aria-describedby="footer-description">
+                Tour
+              </a>
+              <a href="https://stackoverflow.com/questions/tagged/go?tab=Newest" class="Footer-link" aria-describedby="footer-description">
+                Stack Overflow
+              </a>
+              <a href="/help/" class="Footer-link" aria-describedby="footer-description">
+                Help
+              </a>
+          </div>
+          <div class="Footer-linkColumn">
+            <a href="https://pkg.go.dev" class="Footer-link Footer-link--primary" aria-describedby="footer-description">
+              Packages
+            </a>
+              <a href="/pkg/" class="Footer-link" aria-describedby="footer-description">
+                Standard Library
+              </a>
+              <a href="https://pkg.go.dev/about" class="Footer-link" aria-describedby="footer-description">
+                About Go Packages
+              </a>
+              <a href="https://pkg.go.dev/api" class="Footer-link" aria-describedby="footer-description">
+                pkg.go.dev API
+              </a>
+          </div>
+          <div class="Footer-linkColumn">
+            <a href="/project" class="Footer-link Footer-link--primary" aria-describedby="footer-description">
+              About
+            </a>
+              <a href="/dl/" class="Footer-link" aria-describedby="footer-description">
+                Download
+              </a>
+              <a href="/blog/" class="Footer-link" aria-describedby="footer-description">
+                Blog
+              </a>
+              <a href="https://github.com/golang/go/issues" class="Footer-link" aria-describedby="footer-description">
+                Issue Tracker
+              </a>
+              <a href="/doc/devel/release" class="Footer-link" aria-describedby="footer-description">
+                Release Notes
+              </a>
+              <a href="/brand" class="Footer-link" aria-describedby="footer-description">
+                Brand Guidelines
+              </a>
+              <a href="/conduct" class="Footer-link" aria-describedby="footer-description">
+                Code of Conduct
+              </a>
+          </div>
+          <div class="Footer-linkColumn">
+            <a href="/wiki/#the-go-community" class="Footer-link Footer-link--primary" aria-describedby="footer-description">
+              Connect
+            </a>
+              <a href="https://bsky.app/profile/golang.org" class="Footer-link" aria-describedby="footer-description">
+                Bluesky
+              </a>
+              <a href="https://hachyderm.io/@golang" class="Footer-link" aria-describedby="footer-description">
+                Mastodon
+              </a>
+              <a href="https://www.twitter.com/golang" class="Footer-link" aria-describedby="footer-description">
+                Twitter
+              </a>
+              <a href="https://github.com/golang" class="Footer-link" aria-describedby="footer-description">
+                GitHub
+              </a>
+              <a href="https://invite.slack.golangbridge.org/" class="Footer-link" aria-describedby="footer-description">
+                Slack
+              </a>
+              <a href="https://reddit.com/r/golang" class="Footer-link" aria-describedby="footer-description">
+                r/golang
+              </a>
+              <a href="https://www.meetup.com/pro/go" class="Footer-link" aria-describedby="footer-description">
+                Meetup
+              </a>
+              <a href="https://golangweekly.com/" class="Footer-link" aria-describedby="footer-description">
+                Golang Weekly
+              </a>
+          </div>
+      </div>
+    </div>
+  </div>
+  <div class="screen-reader-only" id="footer-description" hidden>
+          Opens in new window.
+  </div>
+  <div class="Footer">
+    <div class="Container Container--fullBleed">
+      <div class="Footer-bottom">
+        <img class="Footer-gopher" src="/images/gophers/pilot-bust.svg" alt="The Go Gopher">
+        <ul class="Footer-listRow">
+          <li class="Footer-listItem">
+            <a href="/copyright" aria-describedby="footer-description">Copyright</a>
+          </li>
+          <li class="Footer-listItem">
+            <a href="/tos" aria-describedby="footer-description">Terms of Service</a>
+          </li>
+          <li class="Footer-listItem">
+            <a href="http://www.google.com/intl/en/policies/privacy/" aria-describedby="footer-description"
+              target="_blank"
+              rel="noopener">
+              Privacy Policy
+            </a>
+            </li>
+          <li class="Footer-listItem">
+            <a
+              href="/s/website-issue" aria-describedby="footer-description"
+              target="_blank"
+              rel="noopener"
+              >
+              Report an Issue
+            </a>
+          </li>
+          <li class="Footer-listItem go-Footer-listItem">
+            <button class="go-Button go-Button--text go-Footer-toggleTheme js-toggleTheme" aria-label="Toggle theme">
+              <img
+                data-value="auto"
+                class="go-Icon go-Icon--inverted"
+                height="24"
+                width="24"
+                src="/images/icons/brightness_6_gm_grey_24dp.svg"
+                alt="System theme">
+              <img
+                data-value="dark"
+                class="go-Icon go-Icon--inverted"
+                height="24"
+                width="24"
+                src="/images/icons/brightness_2_gm_grey_24dp.svg"
+                alt="Dark theme">
+              <img
+                data-value="light"
+                class="go-Icon go-Icon--inverted"
+                height="24"
+                width="24"
+                src="/images/icons/light_mode_gm_grey_24dp.svg"
+                alt="Light theme">
+            </button>
+          </li>
+        </ul>
+        <a class="Footer-googleLogo" target="_blank" href="https://google.com" rel="noopener">
+          <img class="Footer-googleLogoImg" src="/images/google-white.png" alt="Google logo">
+        </a>
+      </div>
+    </div>
+  </div>
+  <script src="/js/jquery.js"></script>
+  <script src="/js/carousels.js"></script>
+  <script src="/js/searchBox.js"></script>
+  <script src="/js/misc.js"></script>
+  <script src="/js/hats.js"></script>
+  <script src="/js/playground.js"></script>
+  <script src="/js/godocs.js"></script>
+  <script async src="/js/copypaste.js"></script>
+</footer>
+<section class="Cookie-notice js-cookieNotice">
+  <div>go.dev uses cookies from Google to deliver and enhance the quality of its services and to
+  analyze traffic. <a target=_blank href="https://policies.google.com/technologies/cookies">Learn more.</a></div>
+  <div><button class="go-Button">Okay</button></div>
+</section>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

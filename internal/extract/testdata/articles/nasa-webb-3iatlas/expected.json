@@ -1,0 +1,61 @@
+{
+  "title": "NASA’s Webb Detects Methane on Interstellar Comet 3I/ATLAS - NASA Science",
+  "byline": "Alise Fisher",
+  "site_name": "NASA Science",
+  "language": "en-US",
+  "excerpt": "NASA’s James Webb Space Telescope has collected its first mid-infrared chemical fingerprint of an interstellar object during a recent revisit to comet 3I/ATLAS.",
+  "lead_image": "https://assets.science.nasa.gov/content/dam/science/astro/universe/news-images/NASA-Webb-Detects-Methane-3I-ATLAS.png/jcr:content/renditions/cq5dam.web.1280.1280.png",
+  "published_at": "2026-06-01T14:57:18Z",
+  "modified_at": "2026-09-23T02:40:18Z",
+  "blocks": [
+    {
+      "kind": "heading",
+      "text": "NASA’s Webb Detects Methane on Interstellar Comet 3I/ATLAS"
+    },
+    {
+      "kind": "paragraph",
+      "text": "NASA’s James Webb Space Telescope has collected its first mid-infrared chemical fingerprint of an interstellar object during a recent revisit to comet 3I/ATLAS. The team’s results published recently in The Astrophysical Journal Letters."
+    },
+    {
+      "kind": "paragraph",
+      "text": "The observations were taken using Webb’s MIRI (Mid-Infrared Instrument) on two separate dates as the comet traveled back out of our solar system after whipping around the Sun (post-perihelion). The first observation occurred Dec. 15 to 16, when the comet was about 205 million miles (329 million kilometers) from the Sun. This was followed by a second observation Dec. 27, when the comet was about 236 million miles (379 million kilometers) from the Sun."
+    },
+    {
+      "kind": "paragraph",
+      "text": "For the first time on an interstellar visitor, Webb directly detected methane gas. Methane is highly volatile, meaning it sublimates from solid ice into a gas very easily. Its delayed appearance in comet 3I/ATLAS suggests it was buried below the comet’s top surface layer and protected from sublimation until heat from the comet’s close pass to the Sun reached deeper parts of the icy subsurface. The amount of methane relative to water found is surprisingly high, with few similar analogs in our own solar system."
+    },
+    {
+      "kind": "paragraph",
+      "text": "Webb’s observations also confirmed that comet 3I/ATLAS remains unusually rich in carbon dioxide, releasing far more carbon dioxide relative to water when compared to typical solar system comets."
+    },
+    {
+      "kind": "paragraph",
+      "text": "Both these findings point to a very different formation environment and chemistry than the vast majority of comets that formed within our solar system."
+    },
+    {
+      "kind": "paragraph",
+      "text": "Additionally, Webb observed a sharp decline in gas production as comet 3I/ATLAS moved farther from the Sun, with water showing the most pronounced drop. This is expected behavior for an object like this – as the comet gets less heat from the Sun, the surface gets colder and less ice is being vaporized. Water, which is less volatile than methane or carbon dioxide, is quicker to “shut off” its gas production."
+    },
+    {
+      "kind": "paragraph",
+      "text": "Webb observed comet 3I/ATLAS using MIRI’s Medium Resolution Spectrometer, a powerful instrument designed to break infrared light into its component wavelengths. This spectrometer is an integral field unit, which provides a spectrum at every point in a small patch of sky, allowing the team to simultaneously measure what gases are present and visualize their distribution around the comet’s nucleus."
+    },
+    {
+      "kind": "caption",
+      "text": "The top image shows interstellar comet 3I/ATLAS as seen with MIRI (Mid-Infrared Instrument) on NASA’s James Webb Space Telescope, along with contours that illustrate where different gases were located at the time the comet was viewed. Water vapor spreads far beyond the nucleus because much of it is released from icy grains in the coma, while carbon dioxide and methane are most concentrated near the comet’s nucleus. The bottom image shows the spectrum, with the labels indicating the features from the various gases that Webb found escaping from the comet."
+    },
+    {
+      "kind": "caption",
+      "text": "Credit: NASA, ESA, CSA, STScI, M. Belyakov (Caltech), I. Wong (STScI), Image Processing: A. Pagan (STScI)"
+    }
+  ],
+  "word_count": 488,
+  "images": [
+    {
+      "url": "https://assets.science.nasa.gov/dynamicimage/assets/science/astro/universe/news-images/NASA-Webb-Detects-Methane-3I-ATLAS.png?w=1115&h=982&fit=crop&crop=faces%2Cfocalpoint",
+      "alt": "The top image shows interstellar comet 3I/ATLAS as seen with MIRI (Mid-Infrared Instrument) on NASA’s James Webb Space Telescope, along with contours that illustrate where different gases were located at the time the comet was viewed. Water vapor spreads far beyond the nucleus because much of it is released from icy grains in the coma, while carbon dioxide and methane are most concentrated near the comet’s nucleus. The bottom image shows the spectrum, with the labels indicating the features from the various gases that Webb found escaping from the comet.",
+      "context": "…to break infrared light into its component wavelengths. This spectrometer is an integral field unit, which provides a spectrum at every point in a small patch of sky, allowing the team to simultaneously measure what gases are present and visualize their distribution around the comet’s nucleus. … The top image shows interstellar comet 3I/ATLAS as seen with MIRI (Mid-Infrared Instrument) on NASA’s James Webb Space Telescope, along with contours that illustrate where different gases were located at the time the comet was viewed. Water vapor spreads far beyond the nucleus because much of it…",
+      "block": 8
+    }
+  ]
+}

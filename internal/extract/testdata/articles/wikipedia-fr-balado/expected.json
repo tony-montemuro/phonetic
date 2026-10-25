@@ -1,0 +1,262 @@
+{
+  "title": "Podcast",
+  "byline": "Contributeurs aux projets Wikimedia",
+  "site_name": "Fondation Wikimedia, Inc.",
+  "language": "fr",
+  "excerpt": "Le podcasting (podcast) est un mode de production et de diffusion sur Internet de programmes audio à la demande[note 1], généralement organisés en séries et en épisodes. Historiquement, leur distribution repose sur un flux RSS permettant l’abonnement et le téléchargement automatique des…",
+  "lead_image": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0d/Wikidata_WikiProject_Podcast_logo.svg/960px-Wikidata_WikiProject_Podcast_logo.svg.png?utm_source=fr.wikipedia.org&utm_campaign=index&utm_content=thumbnail",
+  "published_at": "2004-11-21T21:38:10Z",
+  "blocks": [
+    {
+      "kind": "paragraph",
+      "text": "Le podcasting (podcast) est un mode de production et de diffusion sur Internet de programmes audio à la demande, généralement organisés en séries et en épisodes. Historiquement, leur distribution repose sur un flux RSS permettant l’abonnement et le téléchargement automatique des nouveaux épisodes ; leur écoute s’effectue également en streaming au moyen d’applications, de sites et de plateformes numériques. Le podcast est appelé balado au Canada."
+    },
+    {
+      "kind": "paragraph",
+      "text": "Par extension, l’expression « podcast vidéo » désigne des programmes sonores accompagnés d’une image fixe ou filmée (podcast \"avec\" vidéo). Cet usage, qui ne fait pas l’objet d’une définition juridique spécifique, témoigne de l’hybridation croissante entre l’audio, la vidéo et les réseaux sociaux."
+    },
+    {
+      "kind": "heading",
+      "text": "Historique"
+    },
+    {
+      "kind": "paragraph",
+      "text": "Le mot « podcast » provient de la combinaison des termes « iPod » et « broadcasting ». Si le principe existe depuis 2000, le terme « podcasting » a été proposé en 2004 par Ben Hammersley du journal britannique The Guardian."
+    },
+    {
+      "kind": "paragraph",
+      "text": "Le podcasting trouve son origine dans l’avènement du Web 2.0 et en France particulièrement dans le développement de technologies comme le RSS."
+    },
+    {
+      "kind": "paragraph",
+      "text": "Dans son article présentant le Web 2.0, Tim O'Reilly dénote les possibilités qu’offrent les flux RSS : « RSS n’est désormais plus seulement utilisé pour afficher les actualités des blogs, mais aussi pour toute sorte de données régulièrement mises à jour : cours de la bourse, météo, disponibilité de photos ». Même si O’Reilly ne parle alors pas de vidéo, cela se présente comme une évolution logique de la syndication des contenus."
+    },
+    {
+      "kind": "paragraph",
+      "text": "En France, tmdjc.com est le premier site Web à proposer des podcasts gratuits, à partir du 21 décembre 2001. Il sera la source d'inspiration de nombreux podcasts comme Haut Bas gauche Droite, Beside Games, Level MAX ou encore Hey, tu connais. Il est suivi de Arte-radio.com à partir du 1er février 2004 (licence Creative Commons) puis par Gameblog le 20 février 2007, qui sera également une source d'inspiration pour un nombre incroyable de podcasts (comme Bas Gros Poing, La Caz Retro, La Cellule…)."
+    },
+    {
+      "kind": "heading",
+      "text": "Adoption"
+    },
+    {
+      "kind": "paragraph",
+      "text": "À partir de 2010, on voit fleurir en France des annuaires regroupant de nombreux flux RSS comme PodCloud, Podcast France, Podmust, Blubrry, Castbox…"
+    },
+    {
+      "kind": "paragraph",
+      "text": "En 2014, le podcast Serial aux États-Unis marque un renouveau de l'écoute. Dès le début de sa diffusion, Serial est numéro un des écoutes sur iTunes et, en novembre 2014, il devient le premier podcast à atteindre les 5 millions de téléchargements et d'écoutes en streaming. À la suite de cette série, entre 2015 et 2016, la notoriété des podcasts explose aux États-Unis."
+    },
+    {
+      "kind": "paragraph",
+      "text": "En 2018, le podcasting connaît une effervescence avec l'arrivée de créateurs de plus en plus nombreux,, mais c'est un média qui souffre encore d'un déficit de notoriété en France. En 2019, 9 % des Français écoutaient des podcasts natifs (au contenu original non déjà diffusé en radio) au moins une fois par semaine, soit 3,4 millions de personnes,. Au Canada en 2020, environ un adulte sur trois écouterait au moins un podcast (natif et non-natif), par mois. Les podcasts pour enfants ont connu un fort essor avec la pandémie de Covid-19, en France en Suisse et au Canada."
+    },
+    {
+      "kind": "paragraph",
+      "text": "Au début des années 2020, l’offre francophone poursuit son développement. Dans une étude publiée en 2025 et portant sur l’offre disponible à la fin de 2023, l’Arcom et le ministère français de la Culture estiment à plus de dix millions le nombre d’épisodes francophones accessibles, correspondant à plus de 100 000 séries. Le volume d’épisodes disponibles aurait augmenté de 116 % entre 2019 et 2023. Selon une enquête de l’ACPM et de CSA menée en 2024, 44 % des Français déclarent écouter des podcasts,."
+    },
+    {
+      "kind": "heading",
+      "text": "Structuration professionnelle et institutionnelle en France"
+    },
+    {
+      "kind": "paragraph",
+      "text": "En France, le développement du podcast s’accompagne d’une structuration progressive du secteur. En janvier 2020 est créé le Syndicat des producteurs indépendants audio (PIA), qui représente les producteurs et éditeurs professionnels de contenus audio natifs et intervient notamment sur les conditions de production, la rémunération des créateurs, les relations avec les plateformes et la reconnaissance juridique de l’œuvre sonore."
+    },
+    {
+      "kind": "paragraph",
+      "text": "En 2022, l’Arcom et le ministère de la Culture créent l’Observatoire des podcasts, à la suite des recommandations d’un rapport de l’Inspection générale des affaires culturelles. Celui-ci est chargé de documenter l’écosystème du podcast, ses acteurs, ses auteurs, son offre et son économie."
+    },
+    {
+      "kind": "paragraph",
+      "text": "La mesure d'audience du secteur se structure parallèlement. L'Alliance pour les chiffres de la presse et des médias (ACPM) met en place à partir de 2020 une certification de la diffusion des podcasts, limitée aux contenus téléchargés. En novembre 2024, Médiamétrie annonce une refonte de sa mesure et une alliance avec l'ACPM, destinée à remplacer le dispositif eStat Podcast en service depuis 2006 et à aligner la mesure française sur les standards de l'Interactive Advertising Bureau, avec un seuil de soixante secondes pour comptabiliser une écoute et un filtre de vingt-quatre heures contre les doublons ; la nouvelle méthodologie, hybride entre données de journalisation et panel, entre en vigueur en juillet 2025 après six mois de double production. Les deux organismes publient leurs premiers classements unifiés en octobre 2025."
+    },
+    {
+      "kind": "heading",
+      "text": "Podcast natif et podcast de rattrapage"
+    },
+    {
+      "kind": "paragraph",
+      "text": "Deux grandes catégories de programmes sont généralement distinguées. Le podcast de rattrapage correspond à une émission initialement diffusée de manière linéaire, notamment à la radio, puis mise à disposition à la demande. Le podcast natif est conçu dès l’origine pour une diffusion numérique à la demande, sans diffusion préalable à l’antenne."
+    },
+    {
+      "kind": "paragraph",
+      "text": "En France, l’offre demeure largement dominée par la mise à disposition des programmes radiophoniques : selon l’Observatoire des podcasts, 86 % des séries publiées en 2023 sont des podcasts de rattrapage. Cette proportion s’explique notamment par la publication et le découpage en épisodes des programmes diffusés quotidiennement par les stations de radio."
+    },
+    {
+      "kind": "heading",
+      "text": "Podcast vidéo"
+    },
+    {
+      "kind": "paragraph",
+      "text": "Depuis le début des années 2020, un nombre croissant de podcasts fait également l’objet d’une captation vidéo, diffusée intégralement ou sous la forme d’extraits sur les plateformes vidéo et les réseaux sociaux. Cette hybridation facilite la découverte des programmes et permet aux producteurs de toucher des publics qui privilégient les contenus visuels."
+    },
+    {
+      "kind": "paragraph",
+      "text": "YouTube propose depuis 2023 en France un espace permettant d’identifier et de regrouper les podcasts sur les chaînes de ses utilisateurs. Les autres plateformes audio développent également leur offre vidéo, notamment Spotify avec le lancement en France de son programme de rémunération des créateurs de podcasts vidéo en 2025,."
+    },
+    {
+      "kind": "paragraph",
+      "text": "La qualification de « podcast vidéo » demeure discutée : elle peut recouvrir aussi bien un programme audio accompagné d’une image fixe, qu’une animation, ou encore une émission entièrement filmée et conçue pour une consommation visuelle."
+    },
+    {
+      "kind": "heading",
+      "text": "Fonctionnement"
+    },
+    {
+      "kind": "heading",
+      "text": "Concept"
+    },
+    {
+      "kind": "paragraph",
+      "text": "Les podcasts, audio comme vidéo, sont disponibles sur Internet. Ils sont émis par différents types de diffuseurs et automatiquement reçus dans un lecteur, c'est-à-dire une application qui cumule les émissions. Par la suite, l'auditeur peut les écouter directement sur ce lecteur, les télécharger sur son ordinateur personnel ou les transmettre sur son baladeur."
+    },
+    {
+      "kind": "paragraph",
+      "text": "Le podcasting se différencie de la radiodiffusion et de la télédiffusion par la distribution du son ou de l'image non par un mécanisme centralisé qui enverrait un flux vers ses auditeurs (soit « un à tous »), mais par l'action des auditeurs qui téléchargent les fichiers podcasts (soit « tous par un » — ou encore « tirée » au lieu de « poussée »). Les auteurs publient des fichiers et c'est aux auditeurs que revient le rôle de gérer une liste de lecture avec leurs différentes souscriptions. Le téléchargement des fichiers est alors automatisé et issu des multiples sources qu'ils ont choisies. En d'autres termes, c'est l'auditoire qui choisit les auteurs et programmes. Les mises à jour des nouvelles émissions auxquelles ils sont abonnés seront automatiques dans leur agrégateur."
+    },
+    {
+      "kind": "paragraph",
+      "text": "Les deux acteurs du podcasting sont donc :"
+    },
+    {
+      "kind": "list_item",
+      "text": "ceux qui cherchent eux-mêmes les fichiers audio ou vidéo (utilisateur) ;"
+    },
+    {
+      "kind": "list_item",
+      "text": "ceux qui publient sur Internet ces fichiers audio ou vidéo (diffuseur)."
+    },
+    {
+      "kind": "heading",
+      "text": "Formats"
+    },
+    {
+      "kind": "paragraph",
+      "text": "Le format principal du podcast est le flux RSS, qui prend la forme d’un fichier XML et permet d'ajouter des données descriptives et des métadonnées liées aux fichiers (les étiquettes ID3 pour les MP3) au contenu audio ou vidéo. Ces données sont par exemple la date, le titre, un résumé, des liens, des photos, etc. Des fonctionnalités avancées sont disponibles sur les fichiers au format MPEG-4, comme le chapitrage (utile pour arriver directement à une séquence particulière lorsque le contenu lu est assez long ou segmenté en plusieurs rubriques)."
+    },
+    {
+      "kind": "heading",
+      "text": "Diffusion"
+    },
+    {
+      "kind": "heading",
+      "text": "Applications de podcasts"
+    },
+    {
+      "kind": "paragraph",
+      "text": "Les podcasts sont généralement distribués simultanément par l’intermédiaire d’applications dédiées, également appelées agrégateurs de podcasts, telles qu’Apple Podcasts ou Castbox, et de plateformes de streaming audio comme Spotify, Deezer ou Amazon Music. Youtube permet également d'écouter des podcasts (en remplacement de Google Podcasts)."
+    },
+    {
+      "kind": "paragraph",
+      "text": "Dans l’étude publiée par l’Arcom en 2025, les éditeurs interrogés déclarent diffuser leurs programmes sur six plateformes en moyenne, parmi lesquelles des plateformes internationales, des agrégateurs et leurs propres sites ou applications."
+    },
+    {
+      "kind": "paragraph",
+      "text": "Certains éditeurs pratiquent toutefois un fenêtrage de leurs catalogues : une partie des épisodes n’est disponible sur les plateformes tierces que pendant une durée limitée, tandis que l’intégralité des archives demeure accessible sur leur service propriétaire."
+    },
+    {
+      "kind": "heading",
+      "text": "Terminologie"
+    },
+    {
+      "kind": "paragraph",
+      "text": "Les termes « baladodiffusion », « baladodiffuseur », et « balado », ont été proposés par l'Office québécois de la langue française, en octobre 2004 pour les deux premiers et en mai 2005 pour le troisième,,, et consignés dans l'édition 2008 du Petit Larousse, afin de traduire respectivement podcasting, podcaster et podcast, qui sont des nominatifs commerciaux et anglophones. Ces termes français ont été adoptés par certains grands diffuseurs comme Radio-Canada (2005), mais, à quelques exceptions près, pas par les grands médias et diffuseurs européens francophones (français, belges ou suisses). La Commission d'enrichissement de la langue française déconseille l'usage des mots d'origine anglophone (podcasting et podcast) et propose d'utiliser les termes génériques « diffusion pour baladeur » ou « téléchargement »."
+    },
+    {
+      "kind": "paragraph",
+      "text": "Selon la nature du contenu numérique, on précisera de quel type de baladodiffusion il s'agit : « baladodiffusion audio » (audio podcasting ou audiocasting), « baladodiffusion vidéo » (video podcasting ou videocasting), « baladodiffusion radio » (radio podcasting ou radiocasting) ou « baladodiffusion photo » (photo podcasting ou photocasting). On peut également, selon le contexte, désigner le fichier par les termes « balado audio », « balado vidéo », « balado radio » ou « balado photo »."
+    },
+    {
+      "kind": "paragraph",
+      "text": "À l'instar de la radiodiffusion et de la télédiffusion, il est important de différencier le mode de diffusion du produit diffusé (« baladodiffusion » n'est pas synonyme de « balado »). Ainsi, un baladodiffuseur dira : « mon balado de la semaine sur les nouvelles tendances… », « mes émissions sont disponibles par (ou en) baladodiffusion ». Le terme « podcasting » n'est quant à lui que rarement utilisé tel quel, les diffuseurs parlant plus volontiers de [leurs] podcasts (« émission disponible en podcast », etc.)."
+    },
+    {
+      "kind": "heading",
+      "text": "Étymologie"
+    },
+    {
+      "kind": "paragraph",
+      "text": "Le terme anglais « podcast » est un mot-valise créé incidemment en 2004 par le journaliste de la BBC Ben Hammersley par la contraction d'« iPod », le baladeur à succès d'Apple, et de « broadcast », signifiant « diffusion ». Le mot a fait son entrée dans le New Oxford American Dictionary en 2005 : « Enregistrement numérique d'un programme de radio, ou assimilé, disponible sur Internet pour un téléchargement vers un lecteur audio personnel ». Leo Laporte, un diffuseur américain réputé, et quelques autres mordus tentent d'imposer « netcast » depuis qu'Apple essaie de protéger sa marque des noms comportant l'expression « pod »[réf. nécessaire]. D'autres préfèrent justifier la partie « pod » du terme comme étant un acronyme de « Program on Demand » (« programme à la demande »)."
+    },
+    {
+      "kind": "paragraph",
+      "text": "À « podcasting », certains préfèrent parler en anglais de « blogcasting », ou de « webcasting », et plus récemment d'« audioblogging », plus générique."
+    },
+    {
+      "kind": "heading",
+      "text": "Termes utilisés"
+    },
+    {
+      "kind": "paragraph",
+      "text": "Le terme « podcasting » est largement utilisé par les médias européens alors que le terme « baladodiffusion » lui est préféré par les médias québécois et ponctuellement sur les radios de Radio France. Le terme « podiffusion » est également utilisé en Suisse."
+    },
+    {
+      "kind": "heading",
+      "text": "Termes connexes"
+    },
+    {
+      "kind": "paragraph",
+      "text": "Baladodiffuseur, baladodiffuser, baladodiffusable, balado, fichier balado, baladoémission, baladobillet, balado audio, balado vidéo, carnet audio, audioblogue, baladiffusion, audiocast, carnet vidéo, vidéoblogue, vidéoblog, videocast, vodcast, capsule, podcast, podcasting, podcaster, blogcasting, broadcatching, podcatching, podcaching, phonambulle, blogcasting, podiffusion."
+    },
+    {
+      "kind": "heading",
+      "text": "Notes et références"
+    },
+    {
+      "kind": "heading",
+      "text": "Notes"
+    },
+    {
+      "kind": "heading",
+      "text": "Références"
+    },
+    {
+      "kind": "heading",
+      "text": "Annexes"
+    },
+    {
+      "kind": "heading",
+      "text": "Articles connexes"
+    },
+    {
+      "kind": "heading",
+      "text": "Bibliographie"
+    },
+    {
+      "kind": "list_item",
+      "text": "Jean-Michel Plisson, Le Guide du podcasting, First, 19 avril 2006 (ISBN 2-8442-7853-1)"
+    },
+    {
+      "kind": "list_item",
+      "text": "Michel Martin, Blogs, podcasts & videoblogs, CampusPress, 1er décembre 2005 (ISBN 2-7440-2019-2)"
+    },
+    {
+      "kind": "list_item",
+      "text": "Franck Dumesnil, Les Podcasts : écouter, s'abonner, créer, Eyrolles, mai 2006 (ISBN 2-2121-1724-8)"
+    },
+    {
+      "kind": "list_item",
+      "text": "Loïc Le Meur et Laurence Beauvais, Blogs et Podcasts, Dunod, 2007 (ISBN 978-2-1005-0059-8)"
+    },
+    {
+      "kind": "heading",
+      "text": "Liens externes"
+    }
+  ],
+  "word_count": 2092,
+  "images": [
+    {
+      "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0d/Wikidata_WikiProject_Podcast_logo.svg/500px-Wikidata_WikiProject_Podcast_logo.svg.png?utm_source=fr.wikipedia.org&utm_campaign=parser&utm_content=thumbnail",
+      "caption": "WikiProject Podcasts logo",
+      "context": "…leur distribution repose sur un flux RSS permettant l’abonnement et le téléchargement automatique des nouveaux épisodes ; leur écoute s’effectue également en streaming au moyen d’applications, de sites et de plateformes numériques. Le podcast est appelé balado au Canada. … Par extension, l’expression « podcast vidéo » désigne des programmes sonores accompagnés d’une image fixe ou filmée (podcast \"avec\" vidéo). Cet usage, qui ne fait pas l’objet d’une définition juridique spécifique, témoigne de l’hybridation croissante entre l’audio, la vidéo…",
+      "block": 1
+    },
+    {
+      "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b3/Podcast-Schema-fr.svg/1280px-Podcast-Schema-fr.svg.png?utm_source=fr.wikipedia.org&utm_campaign=parser&utm_content=thumbnail",
+      "caption": "Représentation du processus de la baladodiffusion.",
+      "context": "ceux qui publient sur Internet ces fichiers audio ou vidéo (diffuseur). … Formats",
+      "block": 30
+    }
+  ]
+}
