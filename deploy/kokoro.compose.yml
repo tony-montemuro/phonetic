@@ -1,0 +1,17 @@
+# Kokoro TTS for production on the Arch box (NVIDIA GPU).
+# Requires docker plus nvidia-container-toolkit. Start with:
+#   docker compose -f deploy/kokoro.compose.yml up -d
+name: kokoro
+services:
+  kokoro:
+    image: ghcr.io/remsky/kokoro-fastapi-gpu:v0.9.0
+    ports:
+      - "127.0.0.1:8880:8880" # loopback only: phonetic runs on the same host
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

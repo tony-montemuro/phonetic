@@ -1,0 +1,9 @@
+# Kokoro TTS for local development (CPU). Start with `make kokoro-up`.
+# phonetic talks to it at http://127.0.0.1:8880/v1 (OpenAI-compatible).
+name: kokoro
+services:
+  kokoro:
+    image: ghcr.io/remsky/kokoro-fastapi-cpu:v0.9.0
+    ports:
+      - "127.0.0.1:8880:8880" # loopback only
+    restart: "no" # started on demand with make kokoro-up
