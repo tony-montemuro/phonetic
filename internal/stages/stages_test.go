@@ -298,6 +298,8 @@ func TestExtractStageInputErrors(t *testing.T) {
 		}, true, "corrupt"},
 		{"empty final URL", func(t *testing.T, dir artifact.Dir) { writeFetchOutput(t, dir, articlePage, "") }, true, "final URL"},
 		{"relative final URL", func(t *testing.T, dir artifact.Dir) { writeFetchOutput(t, dir, articlePage, "/post") }, true, "final URL"},
+		{"non-http final URL", func(t *testing.T, dir artifact.Dir) { writeFetchOutput(t, dir, articlePage, "ftp://example.com/") }, true, "final URL"},
+		{"unparseable final URL", func(t *testing.T, dir artifact.Dir) { writeFetchOutput(t, dir, articlePage, "http://[::1") }, true, "final URL"},
 		{"unreadable raw.html", func(t *testing.T, dir artifact.Dir) {
 			writeFetchOutput(t, dir, articlePage, "https://example.com/")
 			// A directory where the file should be: a read error that
