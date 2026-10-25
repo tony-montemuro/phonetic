@@ -98,9 +98,9 @@ func (s Extract) Run(ctx context.Context, a store.Article) error {
 	if err != nil {
 		return inputErr(err)
 	}
-	pageURL, err := url.Parse(meta.URL)
-	if err != nil || !pageURL.IsAbs() || (pageURL.Scheme != "http" && pageURL.Scheme != "https") {
-		return pipeline.Permanent(fmt.Errorf("fetch output has no usable final URL (%q); the article must be re-fetched", meta.URL))
+	pageURL, err := parseHTTPURL(meta.URL)
+	if err != nil {
+		return pipeline.Permanent(fmt.Errorf("fetch output has no usable final URL: %w; the article must be re-fetched", err))
 	}
 
 	// Extraction is CPU-bound and bounded by the fetcher's size limit, so it
@@ -130,6 +130,19 @@ func (s Extract) Run(ctx context.Context, a store.Article) error {
 		return fmt.Errorf("saving metadata: %w", err)
 	}
 	return nil
+}
+
+// parseHTTPURL parses an absolute http(s) URL, the only kind a page can be
+// fetched from (and relative links resolved against).
+func parseHTTPURL(raw string) (*url.URL, error) {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return nil, err
+	}
+	if !u.IsAbs() || (u.Scheme != "http" && u.Scheme != "https") {
+		return nil, fmt.Errorf("%q is not an absolute http(s) URL", raw)
+	}
+	return u, nil
 }
 
 // inputErr classifies a failure to read the fetch stage's output. A missing
