@@ -4,9 +4,11 @@ package e2e
 
 import (
 	"encoding/json"
+	"errors"
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -125,5 +127,30 @@ func TestPortInUseExitsWithError(t *testing.T) {
 	}
 	if !strings.Contains(inst.Logs(), "address already in use") {
 		t.Error("output does not mention the listen failure")
+	}
+}
+
+// -h documents every setting and exits 0; stray arguments are an error.
+func TestHelpFlag(t *testing.T) {
+	t.Parallel()
+	for _, arg := range []string{"-h", "-help"} {
+		out, err := exec.Command(binPath, arg).Output() // stdout only: help is pageable
+		if err != nil {
+			t.Fatalf("%s: %v\n%s", arg, err, out)
+		}
+		for _, want := range []string{"Usage: phonetic", "PHONETIC_API_TOKEN", "PHONETIC_FETCH_BLOCKED", "DEV/TEST ONLY"} {
+			if !strings.Contains(string(out), want) {
+				t.Errorf("%s output missing %q:\n%s", arg, want, out)
+			}
+		}
+	}
+	for _, args := range [][]string{{"serve"}, {"-port", "80"}} {
+		cmd := exec.Command(binPath, args...)
+		cmd.Env = []string{} // if parsing regressed, fail fast on config instead of serving
+		err := cmd.Run()
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) || exitErr.ExitCode() != 2 {
+			t.Errorf("%v: err = %v, want exit code 2", args, err)
+		}
 	}
 }

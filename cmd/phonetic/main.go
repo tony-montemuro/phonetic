@@ -4,7 +4,9 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -33,10 +35,40 @@ const (
 )
 
 func main() {
+	// Only -h/-help; all settings come from the environment. Explicit help
+	// goes to stdout (so it can be paged); usage errors go to stderr.
+	flags := flag.NewFlagSet("phonetic", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	switch err := flags.Parse(os.Args[1:]); {
+	case errors.Is(err, flag.ErrHelp):
+		usage(os.Stdout)
+		os.Exit(0)
+	case err != nil:
+		fmt.Fprintf(os.Stderr, "phonetic: %v\n\n", err)
+		usage(os.Stderr)
+		os.Exit(2)
+	case flags.NArg() > 0:
+		fmt.Fprintf(os.Stderr, "phonetic: unexpected arguments: %v\n\n", flags.Args())
+		usage(os.Stderr)
+		os.Exit(2)
+	}
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, "phonetic:", err)
 		os.Exit(1)
 	}
+}
+
+// usage explains that phonetic is configured through environment variables
+// (so secrets stay out of the process's visible command line) and lists them.
+func usage(out io.Writer) {
+	fmt.Fprint(out, `Usage: phonetic
+
+phonetic turns article URLs into a private podcast. It takes no flags besides
+-h; it is configured entirely through environment variables (in production,
+a systemd EnvironmentFile):
+
+`)
+	_ = config.WriteUsage(out) // nowhere to report a failure to print help
 }
 
 func run() error {
