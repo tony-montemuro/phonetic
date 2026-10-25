@@ -16,8 +16,10 @@ import (
 	"time"
 
 	"github.com/tony-montemuro/phonetic/internal/config"
+	"github.com/tony-montemuro/phonetic/internal/fetch"
 	"github.com/tony-montemuro/phonetic/internal/pipeline"
 	"github.com/tony-montemuro/phonetic/internal/server"
+	"github.com/tony-montemuro/phonetic/internal/stages"
 	"github.com/tony-montemuro/phonetic/internal/store"
 )
 
@@ -50,7 +52,7 @@ func run() error {
 	defer stop()
 
 	logger.Info("starting phonetic", "version", version(), "addr", cfg.Addr, "data_dir", cfg.DataDir,
-		"workers", cfg.Workers)
+		"workers", cfg.Workers, "fetch_allow_private", cfg.FetchAllowPrivate, "fetch_blocked", cfg.FetchBlocked)
 
 	if err := os.MkdirAll(cfg.DataDir, 0o750); err != nil {
 		return fmt.Errorf("data dir: %w", err)
@@ -89,12 +91,19 @@ func run() error {
 		logger.Warn("released stale leases from a previous run", "count", n)
 	}
 
-	// TODO(phase-3): remove StubDelay with the stub stages.
+	// TODO(phase-3): remove StubDelay with the last stub stages.
 	if cfg.StubDelay > 0 {
 		logger.Warn("stub stages sleep between steps (PHONETIC_DEV_STUB_DELAY)", "delay", cfg.StubDelay)
 	}
-	runner, err := pipeline.New(st, pipeline.StubStages(cfg.StubDelay), logger,
-		pipeline.Options{Workers: cfg.Workers})
+	if cfg.FetchAllowPrivate {
+		logger.Warn("fetching private and local addresses is allowed (PHONETIC_FETCH_ALLOW_PRIVATE): SSRF protection is off")
+	}
+	fetcher := fetch.New(fetch.Options{AllowPrivate: cfg.FetchAllowPrivate, Blocked: cfg.FetchBlocked})
+	// Real stages replace the stubs as phases land.
+	impls := pipeline.StubStages(cfg.StubDelay)
+	impls[store.StatusFetching] = stages.Fetch{Fetcher: fetcher, DataDir: cfg.DataDir}
+	impls[store.StatusExtracting] = stages.Extract{Store: st, DataDir: cfg.DataDir}
+	runner, err := pipeline.New(st, impls, logger, pipeline.Options{Workers: cfg.Workers})
 	if err != nil {
 		return err
 	}

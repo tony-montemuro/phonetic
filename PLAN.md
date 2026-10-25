@@ -185,6 +185,8 @@ PHONETIC_API_TOKEN=...
 PHONETIC_FEED_USER=... / PHONETIC_FEED_PASSWORD=...
 PHONETIC_WORKERS=2                     # 1-16
 PHONETIC_DEV_STUB_DELAY=0s             # temporary: stub stages sleep this long
+PHONETIC_FETCH_BLOCKED=203.0.113.7     # extra networks never to fetch (e.g. the home WAN IP); always enforced
+PHONETIC_FETCH_ALLOW_PRIVATE=false     # DEV/TEST ONLY: disables SSRF protection; refused unless PHONETIC_ADDR is loopback
 PHONETIC_RETENTION_DAYS=30
 PHONETIC_LLM=anthropic | none
 ANTHROPIC_API_KEY=...
@@ -287,16 +289,23 @@ Each phase ends with something that runs. The goal is to get end-to-end audio in
 - Phase 1 outcome / notes for later phases:
   - Pipeline: `internal/pipeline` Runner with worker **pools** (`Options.Pools`; each stage in exactly one pool), lease heartbeats, claim-time attempt counting, `Permanent` errors, panic recovery, and per-pool wake-ups (`Notify`, stage hand-offs). Phase 3: give synthesizing its own 1-worker pool.
   - Stages get the claimed `store.Article`. Metadata they produce (title, word count, image importance...) must be written through **lease-guarded** store methods (CAS on `store.LeaseOf(a)`), not plain UPDATEs. Write stage files to a temp path and rename, so a superseded worker can't leave half-written outputs.
-  - `PHONETIC_DEV_STUB_DELAY` is a temporary test aid (marked `TODO(phase-3)`). Remove it once the stubs are gone, or switch E2E crash tests to slow fake servers.
+  - `PHONETIC_DEV_STUB_DELAY` is a temporary aid (marked `TODO(phase-3)`); since Phase 2 the E2E crash tests use a slow fake site instead, so it only matters for `make run`. Remove it with the last stubs.
   - A data-dir `flock` enforces single-instance operation. `ReleaseAllLeases` at startup relies on it.
   - Resubmitting a URL whose article failed returns 200 with `status: failed` (no requeue). Phase 7's reprocess endpoint handles retries; the Shortcut can show the returned status.
   - Migrations are a small hand-rolled runner (`internal/store/migrate.go`). If the project gets serious, swap in `pressly/goose` or `golang-migrate`; only `store.Open` calls it.
 
-### Phase 2: Fetch and extract
+### Phase 2: Fetch and extract ✅
 - HTTP fetcher with timeouts, size limit, and the private-IP block.
 - Readability extraction to `extracted.json`; image counting.
 - Real-page fixtures with golden extractions in `internal/extract/testdata/articles/` (openly licensed) and `articles-local/` (gitignored, sites I read).
 - **Done when:** posted URLs end with good `extracted.json` files and metadata in the DB.
+
+- Phase 2 outcome / notes for later phases:
+  - Stages live in `internal/stages`; artifacts in `internal/artifact` (atomic, durable writes). Fetch writes `raw.html` (UTF-8) + `fetch.json` (final URL); extract writes `extracted.json` and lease-guarded metadata (`store.SaveExtracted`).
+  - `extract.Article` is typed blocks (`paragraph`, `heading`, `list_item`, `quote`, `caption`, `preformatted`, `code`, `table`), with `Block.Source` holding originals (TeX) when the spoken text differs. `Article.SpokenText()` is what Phase 3 should synthesize (code/tables become placeholders).
+  - Known extraction gaps left for the Phase 6 LLM: Wikipedia end-of-article heading stubs and bibliographies are spoken; MDN loses its intro (readability drops `.layout__header`); bylines can include dates.
+  - Fetcher SSRF guard: public addresses only, minus this machine's networks (public IPv6 widened to /56) and `PHONETIC_FETCH_BLOCKED`. Remaining gap: router hairpin to the WAN IPv4 — set `PHONETIC_FETCH_BLOCKED` to it in production.
+  - E2E has a fake article site (`e2e/site_test.go`); instances run with `PHONETIC_FETCH_ALLOW_PRIVATE=true` (loopback only).
 
 ### Phase 3: TTS and audio
 - Kokoro container on the Mac (CPU) via `make kokoro-up`; pick a voice. The GPU setup on Arch happens in Phase 4.
