@@ -185,16 +185,21 @@ func (s *Store) ListArticles(ctx context.Context, opts ListOptions) ([]Article, 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []Article
-	for rows.Next() {
-		a, err := scanArticle(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, a)
+	return scanArticles(rows)
+}
+
+// ListReady returns up to limit (> 0) ready articles, most recently
+// finished first: the episodes of the feed.
+func (s *Store) ListReady(ctx context.Context, limit int) ([]Article, error) {
+	if limit <= 0 {
+		return nil, fmt.Errorf("ListReady: limit must be positive, got %d", limit)
 	}
-	return out, rows.Err()
+	rows, err := s.db.QueryContext(ctx, `SELECT `+articleColumns+` FROM articles
+		WHERE status = ? ORDER BY ready_at DESC, id DESC LIMIT ?`, StatusReady, limit)
+	if err != nil {
+		return nil, err
+	}
+	return scanArticles(rows)
 }
 
 // ClaimArticle leases the next runnable article: a non-terminal status,
@@ -394,6 +399,20 @@ func scanArticle(sc scanner) (Article, error) {
 
 // nullString and nullMillis encode zero values as NULL; they mirror the
 // decoding in scanArticle.
+// scanArticles reads every row into an Article and closes rows.
+func scanArticles(rows *sql.Rows) ([]Article, error) {
+	defer rows.Close()
+	var out []Article
+	for rows.Next() {
+		a, err := scanArticle(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
 func nullString(s string) any {
 	if s == "" {
 		return nil

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -48,6 +49,22 @@ func assertNothingClaimable(t *testing.T, s *Store, now time.Time, stages ...Sta
 	t.Helper()
 	if a, err := s.ClaimArticle(context.Background(), now, testLease, stages...); !errors.Is(err, ErrNoWork) {
 		t.Fatalf("ClaimArticle = (%d, %v), want ErrNoWork", a.ID, err)
+	}
+}
+
+// mustFinish runs the oldest unfinished article through every remaining
+// stage, reaching ready at now.
+func mustFinish(t *testing.T, s *Store, now time.Time) Article {
+	t.Helper()
+	for {
+		a := mustClaim(t, s, now)
+		next, err := s.CompleteStage(context.Background(), LeaseOf(a), now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if next == StatusReady {
+			return mustGet(t, s, a.ID)
+		}
 	}
 }
 
@@ -196,6 +213,35 @@ func TestGetAndListArticles(t *testing.T) {
 	limited, err := s.ListArticles(ctx, ListOptions{Limit: 1})
 	if err != nil || len(limited) != 1 {
 		t.Errorf("Limit 1 = %v, %v", articleIDs(limited), err)
+	}
+}
+
+func TestListReady(t *testing.T) {
+	t.Parallel()
+	s := openStore(t)
+	ctx := context.Background()
+	for i := range 4 {
+		mustInsert(t, s, fmt.Sprintf("https://example.com/%d", i), t0)
+	}
+	// Finish 1, 2 and 3 out of id order: 1 last.
+	first := mustFinish(t, s, t0.Add(time.Minute))
+	second := mustFinish(t, s, t0.Add(3*time.Minute))
+	third := mustFinish(t, s, t0.Add(2*time.Minute))
+	// The fourth stays queued.
+
+	got, err := s.ListReady(ctx, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []int64{second.ID, third.ID, first.ID}
+	if !slices.Equal(articleIDs(got), want) {
+		t.Errorf("ListReady = %v, want %v (newest ready first, ready only)", articleIDs(got), want)
+	}
+	if limited, err := s.ListReady(ctx, 1); err != nil || len(limited) != 1 || limited[0].ID != second.ID {
+		t.Errorf("ListReady(1) = %v, %v", articleIDs(limited), err)
+	}
+	if _, err := s.ListReady(ctx, 0); err == nil {
+		t.Error("ListReady(0) accepted; it would silently return nothing")
 	}
 }
 
