@@ -65,7 +65,11 @@ func runMain(m *testing.M) int {
 }
 
 // apiToken is the bearer token every instance is started with.
-const apiToken = "e2e-test-token-0123456789"
+const (
+	apiToken     = "e2e-test-token-0123456789"
+	feedUser     = "phonetic"
+	feedPassword = "e2e-feed-password-0123456789"
+)
 
 // Timeouts used across the harness.
 const (
@@ -151,10 +155,11 @@ func launch(t testing.TB, opts options) *instance {
 	}
 
 	env := map[string]string{
-		"PHONETIC_ADDR":      opts.Addr,
-		"PHONETIC_DATA_DIR":  opts.DataDir,
-		"PHONETIC_LOG_LEVEL": "debug",
-		"PHONETIC_API_TOKEN": apiToken,
+		"PHONETIC_ADDR":          opts.Addr,
+		"PHONETIC_DATA_DIR":      opts.DataDir,
+		"PHONETIC_LOG_LEVEL":     "debug",
+		"PHONETIC_API_TOKEN":     apiToken,
+		"PHONETIC_FEED_PASSWORD": feedPassword,
 		// The fake article site (site_test.go) runs on 127.0.0.1.
 		"PHONETIC_FETCH_ALLOW_PRIVATE": "true",
 		// Never a real engine that happens to run on the default port.

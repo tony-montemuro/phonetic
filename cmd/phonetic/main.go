@@ -88,7 +88,7 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	logger.Info("starting phonetic", "version", version(), "addr", cfg.Addr, "data_dir", cfg.DataDir,
+	logger.Info("starting phonetic", "version", version(), "addr", cfg.Addr, "public_url", cfg.PublicURL, "data_dir", cfg.DataDir,
 		"workers", cfg.Workers, "fetch_allow_private", cfg.FetchAllowPrivate, "fetch_blocked", cfg.FetchBlocked,
 		"tts_url", cfg.TTS.URL, "tts_model", cfg.TTS.Model, "tts_voice", cfg.TTS.Voice, "tts_speed", cfg.TTS.Speed)
 
@@ -138,6 +138,9 @@ func run() error {
 	if cfg.FetchAllowPrivate {
 		logger.Warn("fetching private and local addresses is allowed (PHONETIC_FETCH_ALLOW_PRIVATE): SSRF protection is off")
 	}
+	if isLoopbackURL(cfg.PublicURL) {
+		logger.Warn("feed links point at this machine only; set PHONETIC_PUBLIC_URL to the address your phone uses", "public_url", cfg.PublicURL)
+	}
 	if cfg.TTS.APIKey != "" && strings.HasPrefix(cfg.TTS.URL, "http://") && !isLoopbackURL(cfg.TTS.URL) {
 		logger.Warn("PHONETIC_TTS_API_KEY is sent unencrypted: PHONETIC_TTS_URL is plain http to another host")
 	}
@@ -173,6 +176,12 @@ func run() error {
 			Articles: st,
 			Notifier: runner,
 			APIToken: cfg.APIToken,
+
+			Feed:         st,
+			FeedUser:     cfg.Feed.User,
+			FeedPassword: cfg.Feed.Password,
+			PublicURL:    cfg.PublicURL,
+			DataDir:      cfg.DataDir,
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
@@ -262,7 +271,8 @@ func isLoopbackURL(raw string) bool {
 	return err == nil && a.Unmap().IsLoopback()
 }
 
-// shutdownHTTP drains in-flight requests, then force-closes stragglers.
+// shutdownHTTP drains in-flight requests, then force-closes stragglers. An
+// episode download cut off this way resumes with a range request.
 func shutdownHTTP(logger *slog.Logger, srv *http.Server) {
 	ctx, cancel := context.WithTimeout(context.Background(), httpShutdownTimeout)
 	defer cancel()
