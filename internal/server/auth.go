@@ -32,3 +32,26 @@ func bearerToken(r *http.Request) (string, bool) {
 	tok = strings.TrimSpace(tok)
 	return tok, tok != ""
 }
+
+// requireBasic rejects requests without HTTP basic auth matching user and
+// password (podcast apps prompt for these). Like requireBearer, it compares
+// hashes in constant time, and an empty configured password rejects
+// everything.
+func requireBasic(user, password string, next http.Handler) http.Handler {
+	wantUser := sha256.Sum256([]byte(user))
+	wantPass := sha256.Sum256([]byte(password))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		u, p, ok := r.BasicAuth()
+		gotUser := sha256.Sum256([]byte(u))
+		gotPass := sha256.Sum256([]byte(p))
+		// Both comparisons always run, so timing doesn't reveal which failed.
+		userOK := subtle.ConstantTimeCompare(gotUser[:], wantUser[:])
+		passOK := subtle.ConstantTimeCompare(gotPass[:], wantPass[:])
+		if password == "" || !ok || userOK&passOK != 1 {
+			w.Header().Set("WWW-Authenticate", `Basic realm="phonetic", charset="UTF-8"`)
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}

@@ -23,6 +23,15 @@ type Deps struct {
 	Notifier Notifier
 	// APIToken guards /api/. An empty token locks the API (nothing matches).
 	APIToken string
+	// Feed serves /feed.xml and /audio/, guarded by basic auth with
+	// FeedUser and FeedPassword (an empty password locks them).
+	Feed         FeedStore
+	FeedUser     string
+	FeedPassword string
+	// PublicURL is the base for links in the feed (no trailing slash).
+	PublicURL string
+	// DataDir holds the article artifacts (audio).
+	DataDir string
 	// Now returns the current time; nil means time.Now.
 	Now func() time.Time
 }
@@ -41,14 +50,22 @@ var healthTimeout = 2 * time.Second
 // New returns the root handler for all routes. With an empty APIToken the
 // API is locked (every /api/ request gets 401). With a token set, Articles and
 // Notifier are required; New panics without them, since that is a wiring bug.
+// The same goes for FeedPassword with Feed, PublicURL and DataDir.
 func New(d Deps) http.Handler {
 	if d.APIToken != "" && (d.Articles == nil || d.Notifier == nil) {
 		panic("server: APIToken is set but Articles or Notifier is nil")
 	}
+	if d.FeedPassword != "" && (d.Feed == nil || d.PublicURL == "" || d.DataDir == "") {
+		panic("server: FeedPassword is set but Feed, PublicURL or DataDir is missing")
+	}
 	auth := func(h http.Handler) http.Handler { return requireBearer(d.APIToken, h) }
+	feedAuth := func(h http.Handler) http.Handler { return requireBasic(d.FeedUser, d.FeedPassword, h) }
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", handleHealthz(d.Logger, d.DB))
+	mux.Handle("GET /feed.xml", feedAuth(handleFeed(d)))
+	mux.Handle("GET /audio/{file}", feedAuth(handleAudio(d)))
+	mux.HandleFunc("GET /artwork.png", handleArtwork)
 	mux.Handle("POST /api/articles", auth(handleCreateArticle(d)))
 	mux.Handle("GET /api/articles", auth(handleListArticles(d)))
 	mux.Handle("GET /api/articles/{id}", auth(handleGetArticle(d)))
