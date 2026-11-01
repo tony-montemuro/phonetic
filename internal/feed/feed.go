@@ -73,7 +73,7 @@ func Render(c Channel, episodes []Episode) ([]byte, error) {
 			GUID:        guidXML{IsPermaLink: "false", Value: e.GUID},
 			PubDate:     rfc822(e.PubDate),
 			Enclosure:   enclosureXML{URL: e.AudioURL, Length: e.AudioBytes, Type: "audio/mpeg"},
-			Duration:    int64(math.Round(e.Duration.Seconds())),
+			Duration:    durationSeconds(e.Duration),
 			EpisodeType: "full",
 		})
 	}
@@ -95,6 +95,15 @@ func Render(c Channel, episodes []Episode) ([]byte, error) {
 	}
 	b.WriteByte('\n')
 	return b.Bytes(), nil
+}
+
+// durationSeconds is d in whole seconds, rounded, but at least 1 for any
+// audio (0 omits the tag).
+func durationSeconds(d time.Duration) int64 {
+	if d <= 0 {
+		return 0
+	}
+	return max(1, int64(math.Round(d.Seconds())))
 }
 
 // rfc822 formats t as RSS dates are written (RFC 822 with a four-digit year).

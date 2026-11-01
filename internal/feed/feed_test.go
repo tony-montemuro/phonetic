@@ -171,6 +171,18 @@ func TestRenderInvalidCharacters(t *testing.T) {
 	}
 }
 
+func TestDurationSeconds(t *testing.T) {
+	t.Parallel()
+	for d, want := range map[time.Duration]int64{
+		0: 0, -time.Second: 0, time.Millisecond: 1, 499 * time.Millisecond: 1,
+		1499 * time.Millisecond: 1, 1500 * time.Millisecond: 2, time.Hour: 3600,
+	} {
+		if got := durationSeconds(d); got != want {
+			t.Errorf("durationSeconds(%s) = %d, want %d", d, got, want)
+		}
+	}
+}
+
 func TestRenderEmpty(t *testing.T) {
 	t.Parallel()
 	out, err := Render(testChannel, nil)
