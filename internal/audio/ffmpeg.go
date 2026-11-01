@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -123,6 +124,10 @@ func (t Tools) run(ctx context.Context, name string, stdout io.Writer, args ...s
 	stderr := &limitedBuffer{max: maxStderr}
 	cmd.Stderr = stderr
 	cmd.WaitDelay = 5 * time.Second // bound the wait for output copying after a kill
+	// Its own process group, so a signal meant for phonetic (Ctrl-C in a
+	// terminal) doesn't also kill the tool mid-stage, which would count as a
+	// failure; phonetic cancels ctx (and so kills the tool) as it shuts down.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	if err := cmd.Run(); err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()

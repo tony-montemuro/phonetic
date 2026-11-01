@@ -189,7 +189,9 @@ func launch(t testing.TB, opts options) *instance {
 	inst.cmd.Stdout = inst.logs
 	inst.cmd.Stderr = inst.logs
 	inst.cmd.WaitDelay = waitDelay
-	// Own process group, so kill() also takes down any children it spawns.
+	// Own process group, so signals sent to the test's group don't reach it.
+	// (Its ffmpeg children run in groups of their own and finish or are
+	// killed with their stage; tests don't kill phonetic mid-encode.)
 	inst.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	if err := inst.cmd.Start(); err != nil {
 		t.Fatalf("starting phonetic: %v", err)
