@@ -18,7 +18,7 @@ POST /api/articles ─► queued
    scripting     internal/stages.Script      → script.txt (spoken intro + article text)
    synthesizing  internal/stages.Synthesize  → chunks/*.wav → audio.mp3 + size/duration in the DB
                         │
-                      ready
+                      ready ─► GET /feed.xml, /audio/<id>.mp3 (basic auth)
 ```
 
 ## Packages
@@ -28,7 +28,8 @@ POST /api/articles ─► queued
 | `cmd/phonetic` | Wiring: config, data-dir lock, store, pipeline, HTTP server, ordered shutdown | `run` |
 | `cmd/phonetic-extract` | Dev tool: fetch + extract one URL; capture test fixtures | `run` |
 | `internal/config` | Environment variables → `Config` (all errors reported together) | `Load` |
-| `internal/server` | HTTP API: `/healthz`, `/api/articles` (bearer token) | `New` |
+| `internal/server` | HTTP: `/healthz`, `/api/articles` (bearer token), `/feed.xml` and `/audio/` (basic auth), `/artwork.png` | `New`, `handleFeed` |
+| `internal/feed` | RSS 2.0 + iTunes feed document; channel artwork | `Render` |
 | `internal/urlnorm` | Canonical URL for deduplication | `Normalize` |
 | `internal/store` | SQLite: articles table, the job queue and its leases, migrations | `ClaimArticle`, `leaseWrite` |
 | `internal/pipeline` | Worker pools: claim → run stage (with heartbeat) → record outcome | `Runner.process` |
@@ -77,6 +78,9 @@ GPU); the other stages share `PHONETIC_WORKERS` workers.
 
 **Shutdown order.** HTTP drains, then workers stop (interrupted stages
 release their leases), then the store closes.
+
+**Deployment.** `deploy/` holds the systemd unit, the Kokoro compose files
+and the one-time host steps (`deploy/README.md`).
 
 The schema lives in `internal/store/migrations/`; the testing layout is in
 `PLAN.md` ("Testing strategy").

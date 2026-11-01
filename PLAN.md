@@ -58,7 +58,7 @@ One Go binary runs the HTTP server and the background workers. Kokoro runs next 
 | TTS | `TTS` interface; Kokoro first | Kokoro-FastAPI in Docker serves an OpenAI-compatible `/v1/audio/speech`, so one adapter also covers OpenAI and similar hosted services. Piper adapter (runs the CLI) later. |
 | Audio | `ffmpeg` (external binary) | Joins chunk audio into a single MP3 and reads the duration. |
 | Delivery | RSS 2.0 + iTunes podcast tags | Built from the DB on each request; conditional GET (`304`) via `http.ServeContent`. |
-| Network | Tailscale | Tailscale Funnel only if the chosen podcast app has to fetch from its own servers. |
+| Network | Private VPN: Tailscale or plain WireGuard | phonetic only knows `PHONETIC_ADDR` and `PHONETIC_PUBLIC_URL`; nothing in the code is Tailscale-specific. Tailscale Funnel only if the chosen podcast app has to fetch from its own servers. |
 | Podcast app | Apple Podcasts first, Downcast as fallback | Both appear to refresh on the phone, so they should work over Tailscale. Overcast / Pocket Casts would need Funnel. |
 | Hosting | Arch Linux side of my desktop PC | systemd service; turn off sleep. The server is offline when the PC is off or in Windows. That is acceptable. |
 | Containers | Kokoro only | phonetic runs as a native binary under systemd: Go builds a single static binary, its only system dependency is ffmpeg, and Tailscale and systemd cover networking and supervision. Kokoro (Python/PyTorch/CUDA) runs in Docker. Revisit if more services appear. |
@@ -167,7 +167,7 @@ Retention: the feed shows articles from the last N days (configurable). A cleanu
 
 ## Security
 
-- **Network boundary:** Tailscale. The server listens only on the Tailscale interface (or localhost behind `tailscale serve`).
+- **Network boundary:** a private VPN. The server listens only on loopback behind `tailscale serve`, or on the VPN interface (Tailscale IP or WireGuard address).
 - **API:** bearer token from config, checked in constant time.
 - **Feed/audio:** HTTP basic auth (Apple Podcasts and Downcast prompt for it). Required if we ever turn on Funnel; still worth having without it.
 - **Secrets** (API token, feed password, Anthropic key) come from an environment file loaded by systemd and are never committed.
@@ -214,7 +214,7 @@ The user develops on macOS (Apple Silicon, `darwin/arm64`). The service runs on 
 2. `scp` the binary to the Arch host (`DEPLOY_HOST` variable, over SSH, later via Tailscale)
 3. `ssh $DEPLOY_HOST sudo systemctl restart phonetic`
 
-Arch layout: binary at `/usr/local/bin/phonetic`, data in `/var/lib/phonetic`, secrets in `/etc/phonetic/env` (mode 600, loaded via `EnvironmentFile=`), unit at `/etc/systemd/system/phonetic.service`, run as a dedicated `phonetic` user. Kokoro via `deploy/kokoro.compose.yml` (GPU image) with `restart: unless-stopped`.
+Arch layout: binary at `/usr/local/bin/phonetic`, data in `/var/lib/phonetic`, secrets in `/etc/phonetic/env` (mode 600, loaded via `EnvironmentFile=`), unit at `/etc/systemd/system/phonetic.service`, run by systemd's `DynamicUser` (data really lives in `/var/lib/private/phonetic`, so the `sqlite3` CLI and backups need sudo). Kokoro via `deploy/kokoro.compose.yml` (GPU image) with `restart: unless-stopped`.
 
 **Makefile targets:** `build`, `build-linux`, `run`, `test`, `test-short`, `test-e2e`, `test-all`, `vet`, `fmt`, `fmt-check`, `kokoro-up` / `kokoro-down`, `deploy`, `clean`. Note: macOS ships GNU Make 3.81, so avoid 3.82+ features such as `.ONESHELL`.
 
@@ -230,7 +230,7 @@ Three layers. Each phase adds to all three where it makes sense.
 
 **Test artifacts:**
 - `internal/extract/testdata/articles/`: openly licensed real pages, each with a golden `expected.json` (see its README). `articles-local/` (gitignored) holds pages from sites I actually read. Regenerate with `go test ./internal/extract -run TestFixtures -update`. Diffs get reviewed like code.
-- `testdata/feed/`: a golden `feed.xml` for a known set of articles.
+- `internal/feed/testdata/feed.xml`: golden feed for a known set of episodes (`go test ./internal/feed -update`).
 - `internal/testutil/` (or `fakes/`): reusable fakes: an article site server, an OpenAI-compatible TTS server, an LLM server/stub, and helpers to start the binary and poll status.
 - `cmd/phonetic-extract`: runs fetch and extract on a URL and prints the result; `-save DIR` captures a fixture (fixture format in `internal/extract/extracttest`).
 
@@ -298,12 +298,19 @@ Each phase ends with something that runs. The goal is to get end-to-end audio in
   - ffmpeg/ffprobe are checked at startup; the Arch box needs the `ffmpeg` package.
   - E2E instances get a fake speech engine (`e2e/tts_test.go`) by default; they never reach a real Kokoro.
 
-### Phase 4: Feed and delivery (MVP)
+### Phase 4: Feed and delivery (MVP) — code done; host setup pending
 - `/feed.xml` with iTunes tags and conditional GET; `/audio/{file}` (`<id>.mp3`); basic auth; channel artwork.
-- Arch setup: ffmpeg, Docker + `nvidia-container-toolkit`, Kokoro GPU container, `phonetic` user and directories, `/etc/phonetic/env`.
+- Arch setup: ffmpeg, Docker + `nvidia-container-toolkit`, Kokoro GPU container, `/etc/phonetic/env`.
 - systemd unit; `make deploy`; turn off sleep.
-- Tailscale on the PC and iPhone (and the Mac, for deploying). Subscribe in Apple Podcasts by URL. Fall back to Downcast, or Funnel, if needed.
+- Tailscale or WireGuard on the PC and iPhone (and the Mac, for deploying). Subscribe in Apple Podcasts by URL. Fall back to Downcast, or Funnel, if needed.
 - **Done when:** a new article shows up as an episode on my phone and plays in the car.
+
+- Phase 4 outcome / notes for later phases:
+  - `/feed.xml` (`internal/feed.Render`, RSS 2.0 + iTunes tags, golden-tested) and `/audio/<id>.mp3` behind basic auth (`PHONETIC_FEED_USER`/`PHONETIC_FEED_PASSWORD`); `/artwork.png` (drawn in code, 1400 px) without auth. Feed: body-hash ETag + `no-cache`; audio: `ServeContent` (HEAD, ranges) with a strong ETag for `If-Range`.
+  - Links come from `PHONETIC_PUBLIC_URL` (default `http://<PHONETIC_ADDR>`, with a startup warning when that's loopback).
+  - The feed lists up to 500 ready articles with audio, newest `ready_at` first. Phase 7 retention: the cleanup job must clear `audio_bytes` (the feed and `/audio/` skip articles without it) or filter by date.
+  - Deploy: `deploy/phonetic.service` (DynamicUser, hardened, `KillMode=mixed` so ffmpeg isn't SIGTERMed mid-stage, `Restart=on-failure` covers a VPN address not up at boot), `deploy/phonetic.env.example`, `deploy/README.md` (one-time host steps), `make deploy DEPLOY_HOST=user@host`.
+  - Not done here (needs the host and phone): the Arch setup, subscribing, and the "plays in the car" check.
 
 ### Phase 5: Share Sheet Shortcut
 - Build the iOS Shortcut: accepts URLs from the Share Sheet → POST with bearer token → shows a notification.
@@ -336,5 +343,5 @@ Each phase ends with something that runs. The goal is to get end-to-end audio in
 - Exact Haiku 5.5 model ID and structured-output shape (Phase 6).
 - Anthropic Go SDK vs. raw `net/http` (Phase 6). The SDK is the conventional choice; raw HTTP keeps dependencies minimal.
 - Kokoro voice and speed: `af_heart` at 1.0 for now; revisit after listening in the car.
-- Does Apple Podcasts refresh a Tailscale-only feed reliably (Phase 4)?
+- Does Apple Podcasts accept a basic-auth feed added by URL (and plain HTTP, for the WireGuard option), and refresh it reliably over the VPN (Phase 4)?
 - Retention window (default 30 days).
