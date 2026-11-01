@@ -1,0 +1,52 @@
+# phonetic under systemd. `make deploy` installs this to
+# /etc/systemd/system/phonetic.service; settings and secrets live in
+# /etc/phonetic/env (see phonetic.env.example).
+[Unit]
+Description=phonetic: articles to a private podcast
+Documentation=https://github.com/tony-montemuro/phonetic
+Wants=network-online.target
+After=network-online.target docker.service
+# If PHONETIC_ADDR is a VPN address (WireGuard or Tailscale IP), it may not
+# exist yet at boot: the bind then fails and Restart= below retries until it
+# does. To order after the VPN instead, add a drop-in
+# (systemctl edit phonetic) with e.g. After=wg-quick@wg0.service.
+
+[Service]
+Type=exec
+ExecStart=/usr/local/bin/phonetic
+EnvironmentFile=/etc/phonetic/env
+Environment=PHONETIC_DATA_DIR=/var/lib/phonetic
+Restart=on-failure
+RestartSec=5s
+# SIGTERM to phonetic only: it stops its own ffmpeg children as it releases
+# their work. Everything left is killed at the timeout. Shutdown takes up to
+# 10s (HTTP) + 30s (workers); leave headroom.
+KillMode=mixed
+TimeoutStopSec=60s
+
+# A throwaway user with only /var/lib/phonetic writable.
+DynamicUser=yes
+StateDirectory=phonetic
+StateDirectoryMode=0750
+UMask=0027
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

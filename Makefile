@@ -16,7 +16,7 @@ PHONETIC_API_TOKEN ?= dev-token-not-secret-0000
 PHONETIC_WORKERS   ?= 2
 PHONETIC_FEED_PASSWORD ?= dev-feed-password-not-secret
 
-.PHONY: build build-linux run kokoro-up kokoro-down test test-short test-e2e test-all vet fmt fmt-check tidy-check clean
+.PHONY: build build-linux run deploy kokoro-up kokoro-down test test-short test-e2e test-all vet fmt fmt-check tidy-check clean
 
 build:
 	$(GO) build -trimpath -o $(BIN_DIR)/$(BINARY) $(PKG)
@@ -42,6 +42,21 @@ run: build
 	PHONETIC_TTS_SPEED='$(PHONETIC_TTS_SPEED)' \
 	PHONETIC_TTS_API_KEY='$(PHONETIC_TTS_API_KEY)' \
 	./$(BIN_DIR)/$(BINARY)
+
+# Install the Linux binary and systemd unit on DEPLOY_HOST (user@host, over
+# ssh) and restart phonetic. One-time host setup: deploy/README.md.
+deploy:
+	@test -n "$(DEPLOY_HOST)" || { echo "usage: make deploy DEPLOY_HOST=user@host"; exit 1; }
+	$(MAKE) build-linux
+	scp $(LINUX_BINARY) deploy/phonetic.service $(DEPLOY_HOST):
+	ssh -t $(DEPLOY_HOST) 'set -e; \
+		sudo install -m 0755 $(notdir $(LINUX_BINARY)) /usr/local/bin/phonetic; \
+		sudo install -m 0644 phonetic.service /etc/systemd/system/phonetic.service; \
+		rm $(notdir $(LINUX_BINARY)) phonetic.service; \
+		sudo systemctl daemon-reload; \
+		sudo systemctl enable phonetic; \
+		sudo systemctl restart phonetic; \
+		sleep 2; systemctl --no-pager status phonetic'
 
 # Local Kokoro TTS (CPU) for `make run`; see deploy/ for the GPU version.
 KOKORO_COMPOSE := docker compose -f deploy/kokoro.dev.compose.yml
