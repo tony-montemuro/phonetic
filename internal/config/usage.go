@@ -19,8 +19,11 @@ type Var struct {
 
 // Vars lists every environment variable phonetic reads, in display order.
 var Vars = []Var{
-	{"PHONETIC_API_TOKEN", "(required)", "bearer token for /api/; at least 16 characters"},
+	{"PHONETIC_API_TOKEN", "(required)", fmt.Sprintf("bearer token for /api/; at least %d characters", MinSecretLen)},
+	{"PHONETIC_FEED_PASSWORD", "(required)", fmt.Sprintf("basic auth password for the feed and audio; at least %d characters", MinSecretLen)},
+	{"PHONETIC_FEED_USER", DefaultFeedUser, "basic auth user for the feed and audio"},
 	{"PHONETIC_ADDR", DefaultAddr, "host:port to listen on, with an explicit port (in production, the Tailscale IP)"},
+	{"PHONETIC_PUBLIC_URL", "http://<PHONETIC_ADDR>", "base URL podcast apps reach phonetic at (feed and audio links); set it behind tailscale serve or another proxy, e.g. https://pc.tailnet.ts.net"},
 	{"PHONETIC_DATA_DIR", DefaultDataDir, "database and article files; relative paths resolve against the working directory (/ under systemd)"},
 	{"PHONETIC_LOG_LEVEL", "info", "debug, info, warn or error"},
 	{"PHONETIC_WORKERS", fmt.Sprint(DefaultWorkers), fmt.Sprintf("pipeline workers (1-%d)", MaxWorkers)},

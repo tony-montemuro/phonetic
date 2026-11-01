@@ -18,15 +18,16 @@ import (
 
 // Defaults suitable for local development.
 const (
-	DefaultAddr    = "127.0.0.1:8080"
-	DefaultDataDir = "data"
-	DefaultWorkers = 2
+	DefaultAddr     = "127.0.0.1:8080"
+	DefaultDataDir  = "data"
+	DefaultWorkers  = 2
+	DefaultFeedUser = "phonetic"
 )
 
 // Limits on configured values.
 const (
-	MinAPITokenLen = 16
-	MaxWorkers     = 16
+	MinSecretLen = 16 // API token and feed password
+	MaxWorkers   = 16
 )
 
 // Config is the fully-resolved runtime configuration.
@@ -40,6 +41,13 @@ type Config struct {
 	LogLevel slog.Level
 	// APIToken is the bearer token required by /api/. Required.
 	APIToken string
+	// PublicURL is the base URL clients reach phonetic at (feed, audio and
+	// artwork links are built from it), e.g. https://pc.tailnet.ts.net or
+	// http://10.8.0.1:8080 over WireGuard. No trailing slash. Defaults to
+	// http://<Addr>.
+	PublicURL string
+	// Feed holds the HTTP basic auth credentials for the feed and audio.
+	Feed Feed
 	// Workers is the number of pipeline workers.
 	Workers int
 	// FetchAllowPrivate lets the fetcher reach private and local addresses.
@@ -52,6 +60,12 @@ type Config struct {
 	// TTS configures the OpenAI-compatible speech API (Kokoro-FastAPI by
 	// default).
 	TTS TTS
+}
+
+// Feed holds the podcast feed's basic auth credentials.
+type Feed struct {
+	User     string
+	Password string // never logged
 }
 
 // TTS configures the speech engine.
@@ -72,6 +86,7 @@ func Load(getenv func(string) string) (Config, error) {
 		DataDir:  DefaultDataDir,
 		LogLevel: slog.LevelInfo,
 		Workers:  DefaultWorkers,
+		Feed:     Feed{User: DefaultFeedUser},
 		TTS: TTS{
 			URL:   tts.DefaultBaseURL,
 			Model: tts.DefaultModel,
@@ -106,9 +121,37 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 
 	cfg.APIToken = lookup(getenv, "PHONETIC_API_TOKEN")
-	if len(cfg.APIToken) < MinAPITokenLen {
+	if len(cfg.APIToken) < MinSecretLen {
 		// Never echo the token itself.
-		errs = append(errs, fmt.Errorf("PHONETIC_API_TOKEN: required, at least %d characters", MinAPITokenLen))
+		errs = append(errs, fmt.Errorf("PHONETIC_API_TOKEN: required, at least %d characters", MinSecretLen))
+	}
+
+	if v := lookup(getenv, "PHONETIC_PUBLIC_URL"); v != "" {
+		if err := validateHTTPURL(v); err != nil {
+			errs = append(errs, fmt.Errorf("PHONETIC_PUBLIC_URL %q: %w", v, err))
+		} else {
+			// Normalized (e.g. spaces escaped), so links built on it are valid.
+			u, _ := url.Parse(v)
+			cfg.PublicURL = strings.TrimRight(u.String(), "/")
+		}
+	} else if host, _, err := net.SplitHostPort(cfg.Addr); err == nil {
+		if a, err := netip.ParseAddr(host); host == "" || (err == nil && a.IsUnspecified()) {
+			errs = append(errs, fmt.Errorf("PHONETIC_PUBLIC_URL: required when PHONETIC_ADDR (%q) listens on all addresses", cfg.Addr))
+		} else {
+			cfg.PublicURL = (&url.URL{Scheme: "http", Host: cfg.Addr}).String()
+		}
+	}
+
+	if v := lookup(getenv, "PHONETIC_FEED_USER"); v != "" {
+		cfg.Feed.User = v
+	}
+	if strings.Contains(cfg.Feed.User, ":") {
+		errs = append(errs, errors.New("PHONETIC_FEED_USER: must not contain a colon (HTTP basic auth)"))
+	}
+	cfg.Feed.Password = lookup(getenv, "PHONETIC_FEED_PASSWORD")
+	if len(cfg.Feed.Password) < MinSecretLen {
+		// Never echo the password itself.
+		errs = append(errs, fmt.Errorf("PHONETIC_FEED_PASSWORD: required, at least %d characters", MinSecretLen))
 	}
 
 	if v := lookup(getenv, "PHONETIC_WORKERS"); v != "" {

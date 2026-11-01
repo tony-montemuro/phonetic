@@ -10,16 +10,23 @@ import (
 	"testing"
 )
 
-const validToken = "0123456789abcdef"
+const (
+	validToken    = "0123456789abcdef"
+	validPassword = "fedcba9876543210"
+)
 
-// env returns a getenv over m, with a valid API token unless m sets one.
+// env returns a getenv over m, with a valid API token and feed password
+// unless m sets them.
 func env(m map[string]string) func(string) string {
 	return func(k string) string {
 		if v, ok := m[k]; ok {
 			return v
 		}
-		if k == "PHONETIC_API_TOKEN" {
+		switch k {
+		case "PHONETIC_API_TOKEN":
 			return validToken
+		case "PHONETIC_FEED_PASSWORD":
+			return validPassword
 		}
 		return ""
 	}
@@ -37,8 +44,9 @@ func mustAbs(t *testing.T, p string) string {
 func TestLoadDefaults(t *testing.T) {
 	t.Parallel()
 	want := Config{Addr: DefaultAddr, DataDir: mustAbs(t, DefaultDataDir), LogLevel: slog.LevelInfo,
-		APIToken: validToken, Workers: DefaultWorkers,
-		TTS: TTS{URL: "http://127.0.0.1:8880/v1", Model: "kokoro", Voice: "af_heart", Speed: 1}}
+		APIToken: validToken, Workers: DefaultWorkers, PublicURL: "http://" + DefaultAddr,
+		Feed: Feed{User: "phonetic", Password: validPassword},
+		TTS:  TTS{URL: "http://127.0.0.1:8880/v1", Model: "kokoro", Voice: "af_heart", Speed: 1}}
 	for name, e := range map[string]map[string]string{
 		"unset": nil,
 		"blank": {"PHONETIC_ADDR": "  ", "PHONETIC_DATA_DIR": "\t", "PHONETIC_LOG_LEVEL": " ",
@@ -64,6 +72,8 @@ func TestLoadOverrides(t *testing.T) {
 		"PHONETIC_DATA_DIR":    "/var/lib/phonetic",
 		"PHONETIC_LOG_LEVEL":   "debug",
 		"PHONETIC_API_TOKEN":   " a-much-longer-secret-token ",
+		"PHONETIC_PUBLIC_URL":  "https://pc.example.ts.net/",
+		"PHONETIC_FEED_USER":   "me",
 		"PHONETIC_WORKERS":     "4",
 		"PHONETIC_TTS_URL":     "https://api.openai.com/v1",
 		"PHONETIC_TTS_MODEL":   "tts-1",
@@ -75,8 +85,9 @@ func TestLoadOverrides(t *testing.T) {
 		t.Fatalf("Load: %v", err)
 	}
 	want := Config{Addr: "100.64.0.1:9000", DataDir: "/var/lib/phonetic", LogLevel: slog.LevelDebug,
-		APIToken: "a-much-longer-secret-token", Workers: 4,
-		TTS: TTS{URL: "https://api.openai.com/v1", Model: "tts-1", Voice: "alloy", Speed: 1.25, APIKey: "sk-secret"}}
+		APIToken: "a-much-longer-secret-token", Workers: 4, PublicURL: "https://pc.example.ts.net",
+		Feed: Feed{User: "me", Password: validPassword},
+		TTS:  TTS{URL: "https://api.openai.com/v1", Model: "tts-1", Voice: "alloy", Speed: 1.25, APIKey: "sk-secret"}}
 	if !reflect.DeepEqual(cfg, want) {
 		t.Errorf("got %+v, want %+v", cfg, want)
 	}
@@ -85,9 +96,33 @@ func TestLoadOverrides(t *testing.T) {
 func TestLoadValidAddrs(t *testing.T) {
 	t.Parallel()
 	for _, addr := range []string{"127.0.0.1:8080", "[::1]:8080", ":8080", "localhost:65535"} {
-		if _, err := Load(env(map[string]string{"PHONETIC_ADDR": addr})); err != nil {
+		if _, err := Load(env(map[string]string{"PHONETIC_ADDR": addr, "PHONETIC_PUBLIC_URL": "https://pc.example"})); err != nil {
 			t.Errorf("addr %q: unexpected error %v", addr, err)
 		}
+	}
+}
+
+// Without PHONETIC_PUBLIC_URL, links point at the listening address.
+func TestLoadDefaultPublicURL(t *testing.T) {
+	t.Parallel()
+	for addr, want := range map[string]string{
+		"127.0.0.1:8080":     "http://127.0.0.1:8080",
+		"[::1]:9000":         "http://[::1]:9000",
+		"10.8.0.1:8080":      "http://10.8.0.1:8080",
+		"[fe80::1%en0]:8080": "http://[fe80::1%25en0]:8080",
+	} {
+		cfg, err := Load(env(map[string]string{"PHONETIC_ADDR": addr}))
+		if err != nil || cfg.PublicURL != want {
+			t.Errorf("addr %s: PublicURL = %q, %v; want %q", addr, cfg.PublicURL, err, want)
+		}
+	}
+}
+
+func TestLoadPublicURLIsNormalized(t *testing.T) {
+	t.Parallel()
+	cfg, err := Load(env(map[string]string{"PHONETIC_PUBLIC_URL": "https://pc.example/my podcasts//"}))
+	if err != nil || cfg.PublicURL != "https://pc.example/my%20podcasts" {
+		t.Errorf("PublicURL = %q, %v", cfg.PublicURL, err)
 	}
 }
 
@@ -115,6 +150,13 @@ func TestLoadErrors(t *testing.T) {
 		{"addr port out of range", map[string]string{"PHONETIC_ADDR": ":99999"}, []string{"PHONETIC_ADDR"}},
 		{"addr port zero", map[string]string{"PHONETIC_ADDR": ":0"}, []string{"PHONETIC_ADDR"}},
 		{"bad log level", map[string]string{"PHONETIC_LOG_LEVEL": "loud"}, []string{"PHONETIC_LOG_LEVEL"}},
+		{"missing feed password", map[string]string{"PHONETIC_FEED_PASSWORD": ""}, []string{"PHONETIC_FEED_PASSWORD"}},
+		{"short feed password", map[string]string{"PHONETIC_FEED_PASSWORD": "short"}, []string{"PHONETIC_FEED_PASSWORD"}},
+		{"feed user with colon", map[string]string{"PHONETIC_FEED_USER": "a:b"}, []string{"PHONETIC_FEED_USER"}},
+		{"public url relative", map[string]string{"PHONETIC_PUBLIC_URL": "pc.example.ts.net"}, []string{"PHONETIC_PUBLIC_URL"}},
+		{"public url query", map[string]string{"PHONETIC_PUBLIC_URL": "https://pc/?x"}, []string{"PHONETIC_PUBLIC_URL"}},
+		{"public url needed for wildcard addr", map[string]string{"PHONETIC_ADDR": "0.0.0.0:8080"}, []string{"PHONETIC_PUBLIC_URL"}},
+		{"public url needed for empty host", map[string]string{"PHONETIC_ADDR": ":8080"}, []string{"PHONETIC_PUBLIC_URL"}},
 		{"missing token", map[string]string{"PHONETIC_API_TOKEN": ""}, []string{"PHONETIC_API_TOKEN"}},
 		{"short token", map[string]string{"PHONETIC_API_TOKEN": "short"}, []string{"PHONETIC_API_TOKEN"}},
 		{"15-char token", map[string]string{"PHONETIC_API_TOKEN": "0123456789abcde"}, []string{"PHONETIC_API_TOKEN"}},
@@ -168,12 +210,12 @@ func TestLoadErrors(t *testing.T) {
 
 func TestLoadErrorNeverEchoesToken(t *testing.T) {
 	t.Parallel()
-	_, err := Load(env(map[string]string{"PHONETIC_API_TOKEN": "s3cr3t", "PHONETIC_WORKERS": "lots"}))
+	_, err := Load(env(map[string]string{"PHONETIC_API_TOKEN": "s3cr3t", "PHONETIC_FEED_PASSWORD": "pa55", "PHONETIC_WORKERS": "lots"}))
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	if strings.Contains(err.Error(), "s3cr3t") {
-		t.Errorf("error leaks token: %v", err)
+	if strings.Contains(err.Error(), "s3cr3t") || strings.Contains(err.Error(), "pa55") {
+		t.Errorf("error leaks a secret: %v", err)
 	}
 }
 
